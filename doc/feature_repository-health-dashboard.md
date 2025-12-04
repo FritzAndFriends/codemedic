@@ -1,7 +1,7 @@
-# 🩺 Doctor DotNet — Repository Health Dashboard  
+# 🩺 CodeMedic — Repository Health Dashboard  
 ### *A unified, extensible system for analyzing the health of .NET repositories*
 
-The dashboard should feel like the “front door” to Doctor DotNet — a single command that orchestrates multiple subsystems (including the BOM engine) and produces a holistic, actionable report.
+The dashboard should feel like the "front door" to CodeMedic — a single command that orchestrates multiple subsystems (including the BOM engine) and produces a holistic, actionable report.
 
 Let’s break this down into:
 
@@ -15,7 +15,7 @@ Let’s break this down into:
 
 # ✅ 1. What the Repository Health Dashboard Should Show
 
-Think of the dashboard as a **summary of everything Doctor DotNet knows** about the repo.
+Think of the dashboard as a **summary of everything CodeMedic knows** about the repo.
 
 ### **Dashboard Sections**
 - **Overall Health Score**  
@@ -72,7 +72,7 @@ The BOM becomes the **data backbone** for several dashboard sections.
 Here’s a clean, modular architecture that will scale beautifully.
 
 ```
-DoctorDotNet
+CodeMedic
  ├── Core
  │    ├── RepoScanner
  │    ├── AnalyzerEngine
@@ -197,7 +197,7 @@ This keeps the system clean, modular, and testable.
 
 # ✅ 6. Extensibility Strategy
 
-Doctor DotNet should be built with **plugins** in mind.
+CodeMedic should be built with **plugins** in mind.
 
 ### Plugin examples:
 - Azure plugin  
@@ -213,7 +213,7 @@ Each plugin can contribute:
 - Health scoring inputs  
 - Recommendations  
 
-This makes Doctor DotNet future-proof.
+This makes CodeMedic future-proof.
 
 ---
 

@@ -1,8 +1,8 @@
-# Doctor DotNet — Repository Bill of Materials (BOM)  
+# CodeMedic — Repository Bill of Materials (BOM)  
 *A comprehensive dependency, vendor, and feature inventory for .NET repositories*
 
 ## Overview  
-The **Doctor DotNet Bill of Materials (BOM)** provides a complete, multi‑layered inventory of all external dependencies, frameworks, services, vendors, and environmental requirements used by a .NET codebase. This goes far beyond a simple list of NuGet packages — it delivers enterprise‑grade visibility into the full ecosystem a repository relies on.
+The **CodeMedic Bill of Materials (BOM)** provides a complete, multi‑layered inventory of all external dependencies, frameworks, services, vendors, and environmental requirements used by a .NET codebase. This goes far beyond a simple list of NuGet packages — it delivers enterprise‑grade visibility into the full ecosystem a repository relies on.
 
 The BOM is designed to support:  
 - Compliance and procurement workflows  
@@ -210,23 +210,23 @@ Generate vendor lists for legal or procurement teams.
 
 ### Generate BOM  
 ```
-doctor-dotnet bom generate
+codemedic bom generate
 ```
 
 ### Export BOM  
 ```
-doctor-dotnet bom export --format json
-doctor-dotnet bom export --format md
+codemedic bom export --format json
+codemedic bom export --format md
 ```
 
 ### Compare BOMs  
 ```
-doctor-dotnet bom diff --from main --to feature/new-api
+codemedic bom diff --from main --to feature/new-api
 ```
 
 ### Validate BOM  
 ```
-doctor-dotnet bom validate --rules enterprise.json
+codemedic bom validate --rules enterprise.json
 ```
 
 ---
