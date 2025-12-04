@@ -1,7 +1,7 @@
 ﻿
 using CodeMedic.Commands;
 
-return RootCommandHandler.ProcessArguments(args);
+return await RootCommandHandler.ProcessArguments(args);
 
 
 
