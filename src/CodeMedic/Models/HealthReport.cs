@@ -195,12 +195,51 @@ public class HealthReport
                     projectSubSection.AddElement(packagesList);
                 }
 
-                if (project.ProjectReferenceCount > 0)
+                // Display project references
+                if (project.ProjectReferences.Count > 0)
                 {
-                    projectSubSection.AddElement(new ReportParagraph(
-                        $"Project References: {project.ProjectReferenceCount}",
-                        TextStyle.Info
-                    ));
+                    var projectRefsList = new ReportList
+                    {
+                        Title = $"Project References ({project.ProjectReferences.Count})"
+                    };
+
+                    foreach (var projRef in project.ProjectReferences)
+                    {
+                        var refLabel = $"{projRef.ProjectName}";
+                        if (projRef.IsPrivate)
+                        {
+                            refLabel += " [Private]";
+                        }
+                        projectRefsList.AddItem(refLabel);
+                    }
+
+                    projectSubSection.AddElement(projectRefsList);
+                }
+
+                // Display transitive dependencies
+                if (project.TransitiveDependencies.Count > 0)
+                {
+                    var transitiveDeps = new ReportList
+                    {
+                        Title = $"Transitive Dependencies ({project.TransitiveDependencies.Count})"
+                    };
+
+                    foreach (var transDep in project.TransitiveDependencies.Take(5))
+                    {
+                        var depLabel = $"{transDep.PackageName} ({transDep.Version})";
+                        if (transDep.IsPrivate)
+                        {
+                            depLabel += " [Private]";
+                        }
+                        transitiveDeps.AddItem(depLabel);
+                    }
+
+                    if (project.TransitiveDependencies.Count > 5)
+                    {
+                        transitiveDeps.AddItem($"... and {project.TransitiveDependencies.Count - 5} more");
+                    }
+
+                    projectSubSection.AddElement(transitiveDeps);
                 }
 
                 detailsSection.Elements.Add(projectSubSection);

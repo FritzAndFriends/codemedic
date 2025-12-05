@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using System.Text.Json;
 using CodeMedic.Models;
 using CodeMedic.Models.Report;
 
@@ -33,6 +34,9 @@ public class RepositoryScanner
 
         try
         {
+            // First, restore packages to ensure lock/assets files are generated
+            await RestorePackagesAsync();
+
             var projectFiles = Directory.EnumerateFiles(
                 _rootPath,
                 "*.csproj",
@@ -50,6 +54,48 @@ public class RepositoryScanner
         }
 
         return _projects;
+    }
+
+    /// <summary>
+    /// Restores NuGet packages for the repository to generate lock/assets files.
+    /// </summary>
+    private async Task RestorePackagesAsync()
+    {
+        try
+        {
+            Console.Error.WriteLine("Restoring NuGet packages...");
+            
+            var processInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = $"restore \"{_rootPath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(processInfo);
+            if (process != null)
+            {
+                await process.WaitForExitAsync();
+                
+                if (process.ExitCode == 0)
+                {
+                    Console.Error.WriteLine("Package restore completed successfully.");
+                }
+                else
+                {
+                    var error = await process.StandardError.ReadToEndAsync();
+                    Console.Error.WriteLine($"Package restore completed with warnings/errors: {error}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: Could not restore packages - {ex.Message}. Proceeding with scan...");
+            // Don't throw - we'll work with whatever assets files already exist
+        }
     }
 
     /// <summary>
@@ -209,12 +255,51 @@ public class RepositoryScanner
                     projectSubSection.AddElement(packagesList);
                 }
 
-                if (project.ProjectReferenceCount > 0)
+                // Display project references
+                if (project.ProjectReferences.Count > 0)
                 {
-                    projectSubSection.AddElement(new ReportParagraph(
-                        $"Project References: {project.ProjectReferenceCount}",
-                        TextStyle.Info
-                    ));
+                    var projectRefsList = new ReportList
+                    {
+                        Title = $"Project References ({project.ProjectReferences.Count})"
+                    };
+
+                    foreach (var projRef in project.ProjectReferences)
+                    {
+                        var refLabel = $"{projRef.ProjectName}";
+                        if (projRef.IsPrivate)
+                        {
+                            refLabel += " [Private]";
+                        }
+                        projectRefsList.AddItem(refLabel);
+                    }
+
+                    projectSubSection.AddElement(projectRefsList);
+                }
+
+                // Display transitive dependencies
+                if (project.TransitiveDependencies.Count > 0)
+                {
+                    var transitiveDeps = new ReportList
+                    {
+                        Title = $"Transitive Dependencies ({project.TransitiveDependencies.Count})"
+                    };
+
+                    foreach (var transDep in project.TransitiveDependencies.Take(5))
+                    {
+                        var depLabel = $"{transDep.PackageName} ({transDep.Version})";
+                        if (transDep.IsPrivate)
+                        {
+                            depLabel += " [Private]";
+                        }
+                        transitiveDeps.AddItem(depLabel);
+                    }
+
+                    if (project.TransitiveDependencies.Count > 5)
+                    {
+                        transitiveDeps.AddItem($"... and {project.TransitiveDependencies.Count - 5} more");
+                    }
+
+                    projectSubSection.AddElement(transitiveDeps);
                 }
 
                 detailsSection.Elements.Add(projectSubSection);
@@ -322,8 +407,20 @@ public class RepositoryScanner
 										pr.Attribute("Version")?.Value ?? "unknown"))
                 .ToList();
 
-            // Count project references
-            projectInfo.ProjectReferenceCount = root.Descendants(XName.Get("ProjectReference", ns)).Count();
+            // Extract project references with metadata
+            var projectReferenceElements = root.Descendants(XName.Get("ProjectReference", ns)).ToList();
+            projectInfo.ProjectReferences = projectReferenceElements
+                .Select(prElement => new ProjectReference
+                {
+                    ProjectName = Path.GetFileNameWithoutExtension(prElement.Attribute("Include")?.Value ?? "unknown"),
+                    Path = prElement.Attribute("Include")?.Value ?? "unknown",
+                    IsPrivate = prElement.Attribute("PrivateAssets")?.Value?.ToLower() == "all",
+                    Metadata = prElement.Attribute("Condition")?.Value
+                })
+                .ToList();
+
+            // Extract transitive dependencies from lock or assets file
+            projectInfo.TransitiveDependencies = ExtractTransitiveDependencies(projectFilePath, projectInfo.PackageDependencies, projectInfo.ProjectReferences);
 
             _projects.Add(projectInfo);
         }
@@ -339,5 +436,221 @@ public class RepositoryScanner
 
             _projects.Add(projectInfo);
         }
+    }
+
+    /// <summary>
+    /// Extracts transitive dependencies from packages.lock.json or project.assets.json file.
+    /// Transitive dependencies are packages that are pulled in by direct dependencies.
+    /// Project references are excluded from the results as they are not NuGet packages.
+    /// </summary>
+    private List<TransitiveDependency> ExtractTransitiveDependencies(string projectFilePath, List<Package> directDependencies, List<ProjectReference> projectReferences)
+    {
+        var transitiveDeps = new List<TransitiveDependency>();
+        var projectDir = Path.GetDirectoryName(projectFilePath) ?? "";
+        var projectRefNames = projectReferences.Select(pr => pr.ProjectName.ToLower()).ToHashSet();
+
+        // First, try to read packages.lock.json (if lock file is enabled)
+        var lockFilePath = Path.Combine(projectDir, "packages.lock.json");
+        if (File.Exists(lockFilePath))
+        {
+            transitiveDeps.AddRange(ExtractFromLockFile(lockFilePath, directDependencies, projectRefNames));
+            return transitiveDeps;
+        }
+
+        // Fall back to project.assets.json in the obj folder
+        var assetsFilePath = Path.Combine(projectDir, "obj", "project.assets.json");
+        if (File.Exists(assetsFilePath))
+        {
+            transitiveDeps.AddRange(ExtractFromAssetsFile(assetsFilePath, directDependencies, projectRefNames));
+        }
+
+        return transitiveDeps;
+    }
+
+    /// <summary>
+    /// Extracts transitive dependencies from packages.lock.json.
+    /// </summary>
+    private List<TransitiveDependency> ExtractFromLockFile(string lockFilePath, List<Package> directDependencies, HashSet<string> projectReferenceNames)
+    {
+        var transitiveDeps = new List<TransitiveDependency>();
+        var directPackageNames = directDependencies.Select(d => d.Name.ToLower()).ToHashSet();
+
+        try
+        {
+            var json = File.ReadAllText(lockFilePath);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            // packages.lock.json has a structure like: { "dependencies": { "net10.0": { "packageName": {...} } } }
+            if (root.TryGetProperty("dependencies", out var dependencies))
+            {
+                foreach (var framework in dependencies.EnumerateObject())
+                {
+                    foreach (var package in framework.Value.EnumerateObject())
+                    {
+                        var packageName = package.Name;
+                        
+                        // Skip direct dependencies - we only want transitive ones
+                        if (directPackageNames.Contains(packageName.ToLower()))
+                        {
+                            continue;
+                        }
+
+                        // Skip project references - they are not NuGet packages
+                        if (projectReferenceNames.Contains(packageName.ToLower()))
+                        {
+                            continue;
+                        }
+
+                        if (package.Value.TryGetProperty("resolved", out var version))
+                        {
+                            var transDep = new TransitiveDependency
+                            {
+                                PackageName = packageName,
+                                Version = version.GetString() ?? "unknown",
+                                SourcePackage = FindSourcePackage(package.Value, directDependencies),
+                                IsPrivate = false,
+                                Depth = 1
+                            };
+                            transitiveDeps.Add(transDep);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error reading packages.lock.json: {ex.Message}");
+        }
+
+        return transitiveDeps;
+    }
+
+    /// <summary>
+    /// Extracts transitive dependencies from project.assets.json.
+    /// </summary>
+    private List<TransitiveDependency> ExtractFromAssetsFile(string assetsFilePath, List<Package> directDependencies, HashSet<string> projectReferenceNames)
+    {
+        var transitiveDeps = new List<TransitiveDependency>();
+        var directPackageNames = directDependencies.Select(d => d.Name.ToLower()).ToHashSet();
+
+        try
+        {
+            var json = File.ReadAllText(assetsFilePath);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            // project.assets.json has a "libraries" section with all resolved packages
+            if (root.TryGetProperty("libraries", out var libraries))
+            {
+                foreach (var library in libraries.EnumerateObject())
+                {
+                    var libraryName = library.Name;
+                    
+                    // Parse "packagename/version" format
+                    var parts = libraryName.Split('/');
+                    if (parts.Length != 2)
+                    {
+                        continue;
+                    }
+
+                    var packageName = parts[0];
+                    var version = parts[1];
+
+                    // Skip direct dependencies - we only want transitive ones
+                    if (directPackageNames.Contains(packageName.ToLower()))
+                    {
+                        continue;
+                    }
+
+                    // Skip project references - they are not NuGet packages
+                    if (projectReferenceNames.Contains(packageName.ToLower()))
+                    {
+                        continue;
+                    }
+
+                    var transDep = new TransitiveDependency
+                    {
+                        PackageName = packageName,
+                        Version = version,
+                        SourcePackage = FindSourcePackageFromAssets(packageName, root, directDependencies),
+                        IsPrivate = false,
+                        Depth = 1
+                    };
+                    transitiveDeps.Add(transDep);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error reading project.assets.json: {ex.Message}");
+        }
+
+        return transitiveDeps;
+    }
+
+    /// <summary>
+    /// Attempts to find which direct dependency introduced a transitive dependency.
+    /// </summary>
+    private string? FindSourcePackage(JsonElement packageElement, List<Package> directDependencies)
+    {
+        if (packageElement.TryGetProperty("dependencies", out var dependencies))
+        {
+            foreach (var dep in dependencies.EnumerateObject())
+            {
+                if (directDependencies.Any(d => d.Name.Equals(dep.Name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return dep.Name;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Attempts to find which direct dependency introduced a transitive dependency from project.assets.json.
+    /// </summary>
+    private string? FindSourcePackageFromAssets(string transitiveName, JsonElement root, List<Package> directDependencies)
+    {
+        try
+        {
+            if (!root.TryGetProperty("targets", out var targets))
+            {
+                return null;
+            }
+
+            foreach (var target in targets.EnumerateObject())
+            {
+                foreach (var packageRef in target.Value.EnumerateObject())
+                {
+                    var packageName = packageRef.Name.Split('/')[0];
+
+                    // Check if this is a direct dependency
+                    if (!directDependencies.Any(d => d.Name.Equals(packageName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
+
+                    // Check if this package lists our transitive as a dependency
+                    if (packageRef.Value.TryGetProperty("dependencies", out var deps))
+                    {
+                        foreach (var dep in deps.EnumerateObject())
+                        {
+                            if (dep.Name.Equals(transitiveName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                return packageName;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Silently fail
+        }
+
+        return null;
     }
 }

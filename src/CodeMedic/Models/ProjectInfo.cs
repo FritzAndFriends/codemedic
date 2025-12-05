@@ -51,9 +51,15 @@ public class ProjectInfo
     public List<Package> PackageDependencies { get; set; } = [];
 
     /// <summary>
-    /// Gets or sets the number of project references.
+    /// Gets or sets the list of transitive (indirect) NuGet package dependencies.
+    /// These are packages pulled in by the direct dependencies.
     /// </summary>
-    public int ProjectReferenceCount { get; set; }
+    public List<TransitiveDependency> TransitiveDependencies { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the list of project-to-project references within the repository.
+    /// </summary>
+    public List<ProjectReference> ProjectReferences { get; set; } = [];
 
     /// <summary>
     /// Gets or sets a value indicating whether the project generates documentation.
