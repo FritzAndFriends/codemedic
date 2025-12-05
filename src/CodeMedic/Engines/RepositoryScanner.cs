@@ -11,7 +11,10 @@ namespace CodeMedic.Engines;
 public class RepositoryScanner
 {
     private readonly string _rootPath;
+    private readonly string _normalizedRootPath;
     private readonly List<ProjectInfo> _projects = [];
+    private readonly Dictionary<string, Dictionary<string, string>> _centralPackageVersionCache = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> _centralPackageVersionFiles = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RepositoryScanner"/> class.
@@ -22,6 +25,7 @@ public class RepositoryScanner
         _rootPath = string.IsNullOrWhiteSpace(rootPath) 
             ? Directory.GetCurrentDirectory() 
             : Path.GetFullPath(rootPath);
+        _normalizedRootPath = Path.TrimEndingDirectorySeparator(_rootPath);
     }
 
     /// <summary>
@@ -36,6 +40,8 @@ public class RepositoryScanner
         {
             // First, restore packages to ensure lock/assets files are generated
             await RestorePackagesAsync();
+
+            DiscoverCentralPackageVersionFiles();
 
             var projectFiles = Directory.EnumerateFiles(
                 _rootPath,
@@ -368,6 +374,8 @@ public class RepositoryScanner
                 RelativePath = Path.GetRelativePath(_rootPath, projectFilePath)
             };
 
+            var projectDir = Path.GetDirectoryName(projectFilePath) ?? _rootPath;
+
             // Count lines of code in C# files
             projectInfo.TotalLinesOfCode = CountLinesOfCode(projectFilePath);
 
@@ -419,11 +427,36 @@ public class RepositoryScanner
 
             // Count package references
             var packageReferences = root.Descendants(XName.Get("PackageReference", ns)).ToList();
-            projectInfo.PackageDependencies = packageReferences
-                .Select(pr => new Package(
-                    pr.Attribute("Include")?.Value ?? "unknown",
-                    pr.Attribute("Version")?.Value ?? "unknown"))
-                .ToList();
+            var packageDependencies = new List<Package>();
+
+            foreach (var pr in packageReferences)
+            {
+                var packageName = pr.Attribute("Include")?.Value
+                                 ?? pr.Attribute("Update")?.Value
+                                 ?? "unknown";
+
+                var version = pr.Attribute("Version")?.Value
+                              ?? pr.Element(XName.Get("Version", ns))?.Value;
+
+                if (string.IsNullOrWhiteSpace(version))
+                {
+                    version = ResolveCentralPackageVersion(packageName, projectDir) ?? "unknown";
+                }
+
+                if (string.IsNullOrWhiteSpace(packageName))
+                {
+                    packageName = "unknown";
+                }
+
+                if (string.IsNullOrWhiteSpace(version))
+                {
+                    version = "unknown";
+                }
+
+                packageDependencies.Add(new Package(packageName, version));
+            }
+
+            projectInfo.PackageDependencies = packageDependencies;
 
             // Extract project references with metadata
             var projectReferenceElements = root.Descendants(XName.Get("ProjectReference", ns)).ToList();
@@ -523,6 +556,104 @@ public class RepositoryScanner
         }
 
         return transitiveDeps;
+    }
+
+    private void DiscoverCentralPackageVersionFiles()
+    {
+        try
+        {
+            _centralPackageVersionCache.Clear();
+            _centralPackageVersionFiles = Directory
+                .EnumerateFiles(_rootPath, "Directory.Packages.props", SearchOption.AllDirectories)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: Could not enumerate central package management files: {ex.Message}");
+            _centralPackageVersionFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    private string? ResolveCentralPackageVersion(string packageName, string projectDirectory)
+    {
+        if (_centralPackageVersionFiles.Count == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var current = new DirectoryInfo(Path.GetFullPath(projectDirectory));
+
+            while (current != null)
+            {
+                var currentPath = Path.TrimEndingDirectorySeparator(current.FullName);
+                var propsPath = Path.Combine(current.FullName, "Directory.Packages.props");
+
+                if (_centralPackageVersionFiles.Contains(propsPath))
+                {
+                    var versions = GetCentralPackageVersions(propsPath);
+
+                    if (versions.TryGetValue(packageName, out var resolvedVersion))
+                    {
+                        return resolvedVersion;
+                    }
+                }
+
+                if (string.Equals(currentPath, _normalizedRootPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+
+                current = current.Parent;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: Could not resolve central package version for {packageName}: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    private Dictionary<string, string> GetCentralPackageVersions(string propsPath)
+    {
+        if (_centralPackageVersionCache.TryGetValue(propsPath, out var cached))
+        {
+            return cached;
+        }
+
+        var versions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var doc = XDocument.Load(propsPath);
+            var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
+            var packageVersionElements = doc.Descendants(ns + "PackageVersion");
+
+            foreach (var pkg in packageVersionElements)
+            {
+                var name = pkg.Attribute("Include")?.Value ?? pkg.Attribute("Update")?.Value;
+                var version = pkg.Attribute("Version")?.Value ?? pkg.Element(ns + "Version")?.Value;
+
+                if (string.IsNullOrWhiteSpace(version))
+                {
+                    version = pkg.Attribute("VersionOverride")?.Value ?? pkg.Element(ns + "VersionOverride")?.Value;
+                }
+
+                if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(version))
+                {
+                    versions[name] = version;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: Could not read central package versions from {propsPath}: {ex.Message}");
+        }
+
+        _centralPackageVersionCache[propsPath] = versions;
+        return versions;
     }
 
     /// <summary>
