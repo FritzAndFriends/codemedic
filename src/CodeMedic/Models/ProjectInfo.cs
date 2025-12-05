@@ -72,6 +72,11 @@ public class ProjectInfo
     public List<string> ParseErrors { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets the total lines of code in all C# files in this project (excluding blank lines).
+    /// </summary>
+    public int TotalLinesOfCode { get; set; }
+
+    /// <summary>
     /// Gets the display name for the project.
     /// </summary>
     public string DisplayName => $"{ProjectName} ({RelativePath})";

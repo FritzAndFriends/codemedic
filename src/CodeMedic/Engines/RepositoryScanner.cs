@@ -124,6 +124,7 @@ public class RepositoryScanner
 
         var totalProjects = _projects.Count;
         var totalPackages = _projects.Sum(p => p.PackageDependencies.Count);
+        var totalLinesOfCode = _projects.Sum(p => p.TotalLinesOfCode);
         var projectsWithNullable = _projects.Count(p => p.NullableEnabled);
         var projectsWithImplicitUsings = _projects.Count(p => p.ImplicitUsingsEnabled);
         var projectsWithDocumentation = _projects.Count(p => p.GeneratesDocumentation);
@@ -146,6 +147,7 @@ public class RepositoryScanner
             var summaryKvList = new ReportKeyValueList();
             // this is redundant
 						// summaryKvList.Add("Total Projects", totalProjects.ToString());
+            summaryKvList.Add("Total Lines of Code", totalLinesOfCode.ToString());
             summaryKvList.Add("Total NuGet Packages", totalPackages.ToString());
             summaryKvList.Add("Projects without Nullable", (totalProjects - projectsWithNullable).ToString(),
                 (totalProjects - projectsWithNullable) > 0 ? TextStyle.Success : TextStyle.Warning);
@@ -178,6 +180,7 @@ public class RepositoryScanner
                 "Path",
                 "Framework",
                 "Output Type",
+                "Lines of Code",
                 "Packages",
                 "Settings"
             });
@@ -194,6 +197,7 @@ public class RepositoryScanner
                     project.RelativePath,
                     project.TargetFramework ?? "unknown",
                     project.OutputType ?? "unknown",
+                    project.TotalLinesOfCode.ToString(),
                     project.PackageDependencies.Count.ToString(),
                     settings.Count > 0 ? string.Join(" ", settings) : "-"
                 );
@@ -223,6 +227,7 @@ public class RepositoryScanner
 
                 var detailsKvList = new ReportKeyValueList();
                 detailsKvList.Add("Path", project.RelativePath);
+                detailsKvList.Add("Lines of Code", project.TotalLinesOfCode.ToString());
                 detailsKvList.Add("Output Type", project.OutputType ?? "unknown");
                 detailsKvList.Add("Target Framework", project.TargetFramework ?? "unknown");
                 detailsKvList.Add("Language Version", project.LanguageVersion ?? "default");
@@ -361,6 +366,9 @@ public class RepositoryScanner
                 ProjectName = Path.GetFileNameWithoutExtension(projectFilePath),
                 RelativePath = Path.GetRelativePath(_rootPath, projectFilePath)
             };
+
+            // Count lines of code in C# files
+            projectInfo.TotalLinesOfCode = CountLinesOfCode(projectFilePath);
 
             // Parse the project file XML
             var doc = XDocument.Load(projectFilePath);
@@ -652,5 +660,97 @@ public class RepositoryScanner
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Counts total lines of code in all C# files included in a project, excluding blank lines and comments.
+    /// </summary>
+    private int CountLinesOfCode(string projectFilePath)
+    {
+        try
+        {
+            var projectDir = Path.GetDirectoryName(projectFilePath) ?? "";
+            var csFiles = Directory.EnumerateFiles(projectDir, "*.cs", SearchOption.AllDirectories)
+                .Where(f => !Path.GetFileName(f).StartsWith(".") && 
+                           !f.Contains("\\.vs\\") && 
+                           !f.Contains("\\bin\\") &&
+                           !f.Contains("\\obj\\") &&
+                           !Path.GetFileName(f).EndsWith(".g.cs"))
+                .ToList();
+
+            if (csFiles.Count == 0)
+            {
+                return 0;
+            }
+
+            // Use parallel processing to read and count lines in multiple files simultaneously
+            int totalLines = 0;
+            object lockObj = new object();
+
+            Parallel.ForEach(csFiles, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, csFile =>
+            {
+                try
+                {
+                    var lines = File.ReadAllLines(csFile);
+                    int fileLineCount = CountCodeLines(lines);
+
+                    Interlocked.Add(ref totalLines, fileLineCount);
+                }
+                catch
+                {
+                    // Skip files that can't be read
+                }
+            });
+
+            return totalLines;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Counts code lines in an array of source lines, excluding blank lines and comments (both single-line and block).
+    /// </summary>
+    private int CountCodeLines(string[] lines)
+    {
+        int codeLines = 0;
+        bool inBlockComment = false;
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.TrimStart();
+
+            // Check for block comment end
+            if (inBlockComment)
+            {
+                if (trimmed.Contains("*/"))
+                {
+                    inBlockComment = false;
+                }
+                continue;
+            }
+
+            // Check for block comment start
+            if (trimmed.StartsWith("/*"))
+            {
+                inBlockComment = true;
+                // Check if it ends on the same line
+                if (trimmed.Contains("*/"))
+                {
+                    inBlockComment = false;
+                }
+                continue;
+            }
+
+            // Count line if it's not blank and not a single-line comment
+            if (!string.IsNullOrWhiteSpace(line) && !trimmed.StartsWith("//"))
+            {
+                codeLines++;
+            }
+        }
+
+        return codeLines;
     }
 }
