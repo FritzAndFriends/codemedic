@@ -111,11 +111,11 @@ public class RepositoryScanner
             summaryKvList.Add("Total Lines of Code", totalLinesOfCode.ToString());
             summaryKvList.Add("Total NuGet Packages", totalPackages.ToString());
             summaryKvList.Add("Projects without Nullable", (totalProjects - projectsWithNullable).ToString(),
-                (totalProjects - projectsWithNullable) > 0 ? TextStyle.Success : TextStyle.Warning);
+                (totalProjects - projectsWithNullable) == 0 ? TextStyle.Success : TextStyle.Warning);
             summaryKvList.Add("Projects without Implicit Usings", (totalProjects - projectsWithImplicitUsings).ToString(),
-                (totalProjects - projectsWithImplicitUsings) > 0 ? TextStyle.Success : TextStyle.Warning);
+                (totalProjects - projectsWithImplicitUsings) == 0 ? TextStyle.Success : TextStyle.Warning);
             summaryKvList.Add("Projects missing Documentation", (totalProjects - projectsWithDocumentation).ToString(),
-                (totalProjects - projectsWithDocumentation) > 0 ? TextStyle.Success : TextStyle.Warning);
+                (totalProjects - projectsWithDocumentation) == 0 ? TextStyle.Success : TextStyle.Warning);
             summarySection.AddElement(summaryKvList);
         }
 
