@@ -31,7 +31,7 @@ public class HealthCommand
     {
         try
         {
-            _Renderer.RenderBanner(GetVersion());
+            _Renderer.RenderBanner();
             _Renderer.RenderSectionHeader("Repository Health Dashboard");
 
             // Scan repository

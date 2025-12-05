@@ -98,14 +98,15 @@ public class RepositoryScanner
         if (totalProjects > 0)
         {
             var summaryKvList = new ReportKeyValueList();
-            summaryKvList.Add("Total Projects", totalProjects.ToString());
+            // this is redundant
+						// summaryKvList.Add("Total Projects", totalProjects.ToString());
             summaryKvList.Add("Total NuGet Packages", totalPackages.ToString());
-            summaryKvList.Add("Projects with Nullable", projectsWithNullable.ToString(), 
-                projectsWithNullable > 0 ? TextStyle.Success : TextStyle.Warning);
-            summaryKvList.Add("Projects with Implicit Usings", projectsWithImplicitUsings.ToString(),
-                projectsWithImplicitUsings > 0 ? TextStyle.Success : TextStyle.Warning);
-            summaryKvList.Add("Projects with Documentation", projectsWithDocumentation.ToString(),
-                projectsWithDocumentation > 0 ? TextStyle.Success : TextStyle.Warning);
+            summaryKvList.Add("Projects without Nullable", (totalProjects - projectsWithNullable).ToString(),
+                (totalProjects - projectsWithNullable) > 0 ? TextStyle.Success : TextStyle.Warning);
+            summaryKvList.Add("Projects without Implicit Usings", (totalProjects - projectsWithImplicitUsings).ToString(),
+                (totalProjects - projectsWithImplicitUsings) > 0 ? TextStyle.Success : TextStyle.Warning);
+            summaryKvList.Add("Projects missing Documentation", (totalProjects - projectsWithDocumentation).ToString(),
+                (totalProjects - projectsWithDocumentation) > 0 ? TextStyle.Success : TextStyle.Warning);
             summarySection.AddElement(summaryKvList);
         }
 
@@ -294,6 +295,12 @@ public class RepositoryScanner
             {
                 projectInfo.TargetFramework = propertyGroup.Element(XName.Get("TargetFramework", ns))?.Value;
                 projectInfo.OutputType = propertyGroup.Element(XName.Get("OutputType", ns))?.Value;
+
+								// If output type is not specified, default to Library
+								if (string.IsNullOrWhiteSpace(projectInfo.OutputType))
+								{
+									projectInfo.OutputType = "Library";
+								}
 
                 var nullableElement = propertyGroup.Element(XName.Get("Nullable", ns));
                 projectInfo.NullableEnabled = nullableElement?.Value?.ToLower() == "enable";
