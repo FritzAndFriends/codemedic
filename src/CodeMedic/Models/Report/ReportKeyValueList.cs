@@ -29,7 +29,18 @@ public class ReportKeyValueList : IReportElement
 /// </summary>
 public class KeyValueItem
 {
+    /// <summary>
+    /// Gets or sets the key of the pair.
+    /// </summary>
     public string Key { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the value of the pair.
+    /// </summary>
     public string Value { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the text style to apply to the value.
+    /// </summary>
     public TextStyle ValueStyle { get; set; } = TextStyle.Normal;
 }

@@ -71,4 +71,9 @@ public class ProjectInfo
     public string DisplayName => $"{ProjectName} ({RelativePath})";
 }
 
+/// <summary>
+/// Represents a NuGet package dependency with its name and version.
+/// </summary>
+/// <param name="Name">The name of the package.</param>
+/// <param name="Version">The version of the package.</param>
 public record struct Package(string Name, string Version);
