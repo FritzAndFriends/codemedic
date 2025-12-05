@@ -230,7 +230,7 @@ public class RepositoryScanner
                 detailsKvList.Add("Lines of Code", project.TotalLinesOfCode.ToString());
                 detailsKvList.Add("Output Type", project.OutputType ?? "unknown");
                 detailsKvList.Add("Target Framework", project.TargetFramework ?? "unknown");
-                detailsKvList.Add("Language Version", project.LanguageVersion ?? "default");
+                detailsKvList.Add("C# Language Version", project.LanguageVersion ?? "default");
                 detailsKvList.Add("Nullable Enabled", project.NullableEnabled ? "✓" : "✗",
                     project.NullableEnabled ? TextStyle.Success : TextStyle.Warning);
                 detailsKvList.Add("Implicit Usings", project.ImplicitUsingsEnabled ? "✓" : "✗",
@@ -358,6 +358,7 @@ public class RepositoryScanner
 
     private async Task ParseProjectAsync(string projectFilePath)
     {
+
         try
         {
             var projectInfo = new ProjectInfo
@@ -389,11 +390,11 @@ public class RepositoryScanner
                 projectInfo.TargetFramework = propertyGroup.Element(XName.Get("TargetFramework", ns))?.Value;
                 projectInfo.OutputType = propertyGroup.Element(XName.Get("OutputType", ns))?.Value;
 
-								// If output type is not specified, default to Library
-								if (string.IsNullOrWhiteSpace(projectInfo.OutputType))
-								{
-									projectInfo.OutputType = "Library";
-								}
+                // If output type is not specified, default to Library
+                if (string.IsNullOrWhiteSpace(projectInfo.OutputType))
+                {
+                    projectInfo.OutputType = "Library";
+                }
 
                 var nullableElement = propertyGroup.Element(XName.Get("Nullable", ns));
                 projectInfo.NullableEnabled = nullableElement?.Value?.ToLower() == "enable";
@@ -401,7 +402,16 @@ public class RepositoryScanner
                 var implicitUsingsElement = propertyGroup.Element(XName.Get("ImplicitUsings", ns));
                 projectInfo.ImplicitUsingsEnabled = implicitUsingsElement?.Value?.ToLower() == "enable";
 
-                projectInfo.LanguageVersion = propertyGroup.Element(XName.Get("LangVersion", ns))?.Value;
+                var langVersion = propertyGroup.Element(XName.Get("LangVersion", ns))?.Value;
+                if (!string.IsNullOrWhiteSpace(langVersion))
+                {
+                    projectInfo.LanguageVersion = langVersion;
+                }
+                else
+                {
+                    // Infer default C# language version from TargetFramework
+                    projectInfo.LanguageVersion = InferDefaultCSharpVersion(projectInfo.TargetFramework);
+                }
 
                 var docElement = propertyGroup.Element(XName.Get("GenerateDocumentationFile", ns));
                 projectInfo.GeneratesDocumentation = docElement?.Value?.ToLower() == "true";
@@ -411,8 +421,8 @@ public class RepositoryScanner
             var packageReferences = root.Descendants(XName.Get("PackageReference", ns)).ToList();
             projectInfo.PackageDependencies = packageReferences
                 .Select(pr => new Package(
-										pr.Attribute("Include")?.Value ?? "unknown",
-										pr.Attribute("Version")?.Value ?? "unknown"))
+                    pr.Attribute("Include")?.Value ?? "unknown",
+                    pr.Attribute("Version")?.Value ?? "unknown"))
                 .ToList();
 
             // Extract project references with metadata
@@ -444,6 +454,46 @@ public class RepositoryScanner
 
             _projects.Add(projectInfo);
         }
+    }
+
+    /// <summary>
+    /// Infers the default C# language version for a given target framework, based on Microsoft documentation.
+    /// </summary>
+    /// <param name="targetFramework">The target framework moniker (e.g., net6.0, net7.0, net8.0, net10.0).</param>
+    /// <returns>The default C# language version as a string.</returns>
+    private static string InferDefaultCSharpVersion(string? targetFramework)
+    {
+        if (string.IsNullOrWhiteSpace(targetFramework))
+            return "unknown";
+
+        // Normalize to lower for comparison
+        var tfm = targetFramework.ToLowerInvariant();
+
+        // Mapping based on https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/configure-language-version#defaults
+        // and .NET 10 preview announcements
+        if (tfm.StartsWith("net10.0")) return "14"; 
+        if (tfm.StartsWith("net9.0")) return "13";
+        if (tfm.StartsWith("net8.0")) return "12";
+        if (tfm.StartsWith("net7.0")) return "11";
+        if (tfm.StartsWith("net6.0")) return "10";
+        if (tfm.StartsWith("net5.0")) return "9";
+        if (tfm.StartsWith("netcoreapp3.1")) return "8";
+        if (tfm.StartsWith("netcoreapp3.0")) return "8";
+        if (tfm.StartsWith("netcoreapp2.1")) return "7.3";
+        if (tfm.StartsWith("netcoreapp2.0")) return "7.1";
+        if (tfm.StartsWith("netcoreapp1.")) return "7.0";
+        if (tfm.StartsWith("netstandard2.1")) return "8";
+        if (tfm.StartsWith("netstandard2.0")) return "7.3";
+        if (tfm.StartsWith("netstandard1.")) return "7";
+        if (tfm.StartsWith("net4.8")) return "7.3";
+        if (tfm.StartsWith("net4.7")) return "7";
+        if (tfm.StartsWith("net4.6")) return "6";
+        if (tfm.StartsWith("net4.5")) return "5";
+        if (tfm.StartsWith("net4.0")) return "4";
+        if (tfm.StartsWith("net3.5")) return "3";
+        if (tfm.StartsWith("net2.0")) return "2";
+
+        return "unknown";
     }
 
     /// <summary>
