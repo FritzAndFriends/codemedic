@@ -1,5 +1,4 @@
 using System.Xml.Linq;
-using System.Text.Json;
 using CodeMedic.Models;
 using CodeMedic.Models.Report;
 
@@ -11,10 +10,8 @@ namespace CodeMedic.Engines;
 public class RepositoryScanner
 {
     private readonly string _rootPath;
-    private readonly string _normalizedRootPath;
+        private readonly NuGetInspector _nugetInspector;
     private readonly List<ProjectInfo> _projects = [];
-    private readonly Dictionary<string, Dictionary<string, string>> _centralPackageVersionCache = new(StringComparer.OrdinalIgnoreCase);
-    private HashSet<string> _centralPackageVersionFiles = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RepositoryScanner"/> class.
@@ -25,7 +22,7 @@ public class RepositoryScanner
         _rootPath = string.IsNullOrWhiteSpace(rootPath) 
             ? Directory.GetCurrentDirectory() 
             : Path.GetFullPath(rootPath);
-        _normalizedRootPath = Path.TrimEndingDirectorySeparator(_rootPath);
+            _nugetInspector = new NuGetInspector(_rootPath);
     }
 
     /// <summary>
@@ -39,9 +36,8 @@ public class RepositoryScanner
         try
         {
             // First, restore packages to ensure lock/assets files are generated
-            await RestorePackagesAsync();
-
-            DiscoverCentralPackageVersionFiles();
+            await _nugetInspector.RestorePackagesAsync();
+            _nugetInspector.RefreshCentralPackageVersionFiles();
 
             var projectFiles = Directory.EnumerateFiles(
                 _rootPath,
@@ -60,48 +56,6 @@ public class RepositoryScanner
         }
 
         return _projects;
-    }
-
-    /// <summary>
-    /// Restores NuGet packages for the repository to generate lock/assets files.
-    /// </summary>
-    private async Task RestorePackagesAsync()
-    {
-        try
-        {
-            Console.Error.WriteLine("Restoring NuGet packages...");
-            
-            var processInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "dotnet",
-                Arguments = $"restore \"{_rootPath}\"",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            using var process = System.Diagnostics.Process.Start(processInfo);
-            if (process != null)
-            {
-                await process.WaitForExitAsync();
-                
-                if (process.ExitCode == 0)
-                {
-                    Console.Error.WriteLine("Package restore completed successfully.");
-                }
-                else
-                {
-                    var error = await process.StandardError.ReadToEndAsync();
-                    Console.Error.WriteLine($"Package restore completed with warnings/errors: {error}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: Could not restore packages - {ex.Message}. Proceeding with scan...");
-            // Don't throw - we'll work with whatever assets files already exist
-        }
     }
 
     /// <summary>
@@ -135,6 +89,7 @@ public class RepositoryScanner
         var projectsWithImplicitUsings = _projects.Count(p => p.ImplicitUsingsEnabled);
         var projectsWithDocumentation = _projects.Count(p => p.GeneratesDocumentation);
         var projectsWithErrors = _projects.Where(p => p.ParseErrors.Count > 0).ToList();
+        var versionMismatches = FindPackageVersionMismatches();
 
         // Summary section
         var summarySection = new ReportSection
@@ -165,6 +120,36 @@ public class RepositoryScanner
         }
 
         report.AddSection(summarySection);
+
+        if (versionMismatches.Count > 0)
+        {
+            var mismatchSection = new ReportSection
+            {
+                Title = "Package Version Mismatches",
+                Level = 1
+            };
+
+            mismatchSection.AddElement(new ReportParagraph(
+                "Align package versions across projects to avoid restore/runtime drift.",
+                TextStyle.Warning));
+
+            var mismatchList = new ReportList
+            {
+                Title = "Packages with differing versions"
+            };
+
+            foreach (var mismatch in versionMismatches.OrderBy(m => m.PackageName, StringComparer.OrdinalIgnoreCase))
+            {
+                var versionDetails = string.Join(", ", mismatch.ProjectVersions
+                    .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(kv => $"{kv.Key}={kv.Value}"));
+
+                mismatchList.AddItem($"{mismatch.PackageName}: {versionDetails}");
+            }
+
+            mismatchSection.AddElement(mismatchList);
+            report.AddSection(mismatchSection);
+        }
 
         // Projects table section
         if (totalProjects > 0)
@@ -381,6 +366,7 @@ public class RepositoryScanner
 
             // Parse the project file XML
             var doc = XDocument.Load(projectFilePath);
+            var xmlNamespace = doc.Root?.Name.Namespace ?? XNamespace.None;
             var ns = doc.Root?.Name.NamespaceName ?? "";
             var root = doc.Root;
 
@@ -426,37 +412,7 @@ public class RepositoryScanner
             }
 
             // Count package references
-            var packageReferences = root.Descendants(XName.Get("PackageReference", ns)).ToList();
-            var packageDependencies = new List<Package>();
-
-            foreach (var pr in packageReferences)
-            {
-                var packageName = pr.Attribute("Include")?.Value
-                                 ?? pr.Attribute("Update")?.Value
-                                 ?? "unknown";
-
-                var version = pr.Attribute("Version")?.Value
-                              ?? pr.Element(XName.Get("Version", ns))?.Value;
-
-                if (string.IsNullOrWhiteSpace(version))
-                {
-                    version = ResolveCentralPackageVersion(packageName, projectDir) ?? "unknown";
-                }
-
-                if (string.IsNullOrWhiteSpace(packageName))
-                {
-                    packageName = "unknown";
-                }
-
-                if (string.IsNullOrWhiteSpace(version))
-                {
-                    version = "unknown";
-                }
-
-                packageDependencies.Add(new Package(packageName, version));
-            }
-
-            projectInfo.PackageDependencies = packageDependencies;
+            projectInfo.PackageDependencies = _nugetInspector.ReadPackageReferences(root, xmlNamespace, projectDir);
 
             // Extract project references with metadata
             var projectReferenceElements = root.Descendants(XName.Get("ProjectReference", ns)).ToList();
@@ -471,7 +427,7 @@ public class RepositoryScanner
                 .ToList();
 
             // Extract transitive dependencies from lock or assets file
-            projectInfo.TransitiveDependencies = ExtractTransitiveDependencies(projectFilePath, projectInfo.PackageDependencies, projectInfo.ProjectReferences);
+            projectInfo.TransitiveDependencies = _nugetInspector.ExtractTransitiveDependencies(projectFilePath, projectInfo.PackageDependencies, projectInfo.ProjectReferences);
 
             _projects.Add(projectInfo);
         }
@@ -529,319 +485,49 @@ public class RepositoryScanner
         return "unknown";
     }
 
-    /// <summary>
-    /// Extracts transitive dependencies from packages.lock.json or project.assets.json file.
-    /// Transitive dependencies are packages that are pulled in by direct dependencies.
-    /// Project references are excluded from the results as they are not NuGet packages.
-    /// </summary>
-    private List<TransitiveDependency> ExtractTransitiveDependencies(string projectFilePath, List<Package> directDependencies, List<ProjectReference> projectReferences)
+    private List<PackageVersionMismatch> FindPackageVersionMismatches()
     {
-        var transitiveDeps = new List<TransitiveDependency>();
-        var projectDir = Path.GetDirectoryName(projectFilePath) ?? "";
-        var projectRefNames = projectReferences.Select(pr => pr.ProjectName.ToLower()).ToHashSet();
+        var packageVersions = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
 
-        // First, try to read packages.lock.json (if lock file is enabled)
-        var lockFilePath = Path.Combine(projectDir, "packages.lock.json");
-        if (File.Exists(lockFilePath))
+        foreach (var project in _projects)
         {
-            transitiveDeps.AddRange(ExtractFromLockFile(lockFilePath, directDependencies, projectRefNames));
-            return transitiveDeps;
-        }
-
-        // Fall back to project.assets.json in the obj folder
-        var assetsFilePath = Path.Combine(projectDir, "obj", "project.assets.json");
-        if (File.Exists(assetsFilePath))
-        {
-            transitiveDeps.AddRange(ExtractFromAssetsFile(assetsFilePath, directDependencies, projectRefNames));
-        }
-
-        return transitiveDeps;
-    }
-
-    private void DiscoverCentralPackageVersionFiles()
-    {
-        try
-        {
-            _centralPackageVersionCache.Clear();
-            _centralPackageVersionFiles = Directory
-                .EnumerateFiles(_rootPath, "Directory.Packages.props", SearchOption.AllDirectories)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: Could not enumerate central package management files: {ex.Message}");
-            _centralPackageVersionFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        }
-    }
-
-    private string? ResolveCentralPackageVersion(string packageName, string projectDirectory)
-    {
-        if (_centralPackageVersionFiles.Count == 0)
-        {
-            return null;
-        }
-
-        try
-        {
-            var current = new DirectoryInfo(Path.GetFullPath(projectDirectory));
-
-            while (current != null)
+            foreach (var package in project.PackageDependencies)
             {
-                var currentPath = Path.TrimEndingDirectorySeparator(current.FullName);
-                var propsPath = Path.Combine(current.FullName, "Directory.Packages.props");
-
-                if (_centralPackageVersionFiles.Contains(propsPath))
+                if (string.IsNullOrWhiteSpace(package.Name) || package.Name.Equals("unknown", StringComparison.OrdinalIgnoreCase))
                 {
-                    var versions = GetCentralPackageVersions(propsPath);
-
-                    if (versions.TryGetValue(packageName, out var resolvedVersion))
-                    {
-                        return resolvedVersion;
-                    }
+                    continue;
                 }
 
-                if (string.Equals(currentPath, _normalizedRootPath, StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrWhiteSpace(package.Version) || package.Version.Equals("unknown", StringComparison.OrdinalIgnoreCase))
                 {
-                    break;
+                    continue;
                 }
 
-                current = current.Parent;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: Could not resolve central package version for {packageName}: {ex.Message}");
-        }
-
-        return null;
-    }
-
-    private Dictionary<string, string> GetCentralPackageVersions(string propsPath)
-    {
-        if (_centralPackageVersionCache.TryGetValue(propsPath, out var cached))
-        {
-            return cached;
-        }
-
-        var versions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        try
-        {
-            var doc = XDocument.Load(propsPath);
-            var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
-            var packageVersionElements = doc.Descendants(ns + "PackageVersion");
-
-            foreach (var pkg in packageVersionElements)
-            {
-                var name = pkg.Attribute("Include")?.Value ?? pkg.Attribute("Update")?.Value;
-                var version = pkg.Attribute("Version")?.Value ?? pkg.Element(ns + "Version")?.Value;
-
-                if (string.IsNullOrWhiteSpace(version))
+                if (!packageVersions.TryGetValue(package.Name, out var versionsByProject))
                 {
-                    version = pkg.Attribute("VersionOverride")?.Value ?? pkg.Element(ns + "VersionOverride")?.Value;
+                    versionsByProject = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    packageVersions[package.Name] = versionsByProject;
                 }
 
-                if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(version))
-                {
-                    versions[name] = version;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: Could not read central package versions from {propsPath}: {ex.Message}");
-        }
-
-        _centralPackageVersionCache[propsPath] = versions;
-        return versions;
-    }
-
-    /// <summary>
-    /// Extracts transitive dependencies from packages.lock.json.
-    /// </summary>
-    private List<TransitiveDependency> ExtractFromLockFile(string lockFilePath, List<Package> directDependencies, HashSet<string> projectReferenceNames)
-    {
-        var transitiveDeps = new List<TransitiveDependency>();
-        var directPackageNames = directDependencies.Select(d => d.Name.ToLower()).ToHashSet();
-
-        try
-        {
-            var json = File.ReadAllText(lockFilePath);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            // packages.lock.json has a structure like: { "dependencies": { "net10.0": { "packageName": {...} } } }
-            if (root.TryGetProperty("dependencies", out var dependencies))
-            {
-                foreach (var framework in dependencies.EnumerateObject())
-                {
-                    foreach (var package in framework.Value.EnumerateObject())
-                    {
-                        var packageName = package.Name;
-                        
-                        // Skip direct dependencies - we only want transitive ones
-                        if (directPackageNames.Contains(packageName.ToLower()))
-                        {
-                            continue;
-                        }
-
-                        // Skip project references - they are not NuGet packages
-                        if (projectReferenceNames.Contains(packageName.ToLower()))
-                        {
-                            continue;
-                        }
-
-                        if (package.Value.TryGetProperty("resolved", out var version))
-                        {
-                            var transDep = new TransitiveDependency
-                            {
-                                PackageName = packageName,
-                                Version = version.GetString() ?? "unknown",
-                                SourcePackage = FindSourcePackage(package.Value, directDependencies),
-                                IsPrivate = false,
-                                Depth = 1
-                            };
-                            transitiveDeps.Add(transDep);
-                        }
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error reading packages.lock.json: {ex.Message}");
-        }
-
-        return transitiveDeps;
-    }
-
-    /// <summary>
-    /// Extracts transitive dependencies from project.assets.json.
-    /// </summary>
-    private List<TransitiveDependency> ExtractFromAssetsFile(string assetsFilePath, List<Package> directDependencies, HashSet<string> projectReferenceNames)
-    {
-        var transitiveDeps = new List<TransitiveDependency>();
-        var directPackageNames = directDependencies.Select(d => d.Name.ToLower()).ToHashSet();
-
-        try
-        {
-            var json = File.ReadAllText(assetsFilePath);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            // project.assets.json has a "libraries" section with all resolved packages
-            if (root.TryGetProperty("libraries", out var libraries))
-            {
-                foreach (var library in libraries.EnumerateObject())
-                {
-                    var libraryName = library.Name;
-                    
-                    // Parse "packagename/version" format
-                    var parts = libraryName.Split('/');
-                    if (parts.Length != 2)
-                    {
-                        continue;
-                    }
-
-                    var packageName = parts[0];
-                    var version = parts[1];
-
-                    // Skip direct dependencies - we only want transitive ones
-                    if (directPackageNames.Contains(packageName.ToLower()))
-                    {
-                        continue;
-                    }
-
-                    // Skip project references - they are not NuGet packages
-                    if (projectReferenceNames.Contains(packageName.ToLower()))
-                    {
-                        continue;
-                    }
-
-                    var transDep = new TransitiveDependency
-                    {
-                        PackageName = packageName,
-                        Version = version,
-                        SourcePackage = FindSourcePackageFromAssets(packageName, root, directDependencies),
-                        IsPrivate = false,
-                        Depth = 1
-                    };
-                    transitiveDeps.Add(transDep);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error reading project.assets.json: {ex.Message}");
-        }
-
-        return transitiveDeps;
-    }
-
-    /// <summary>
-    /// Attempts to find which direct dependency introduced a transitive dependency.
-    /// </summary>
-    private string? FindSourcePackage(JsonElement packageElement, List<Package> directDependencies)
-    {
-        if (packageElement.TryGetProperty("dependencies", out var dependencies))
-        {
-            foreach (var dep in dependencies.EnumerateObject())
-            {
-                if (directDependencies.Any(d => d.Name.Equals(dep.Name, StringComparison.OrdinalIgnoreCase)))
-                {
-                    return dep.Name;
-                }
+                versionsByProject[project.ProjectName] = package.Version;
             }
         }
 
-        return null;
-    }
+        var mismatches = new List<PackageVersionMismatch>();
 
-    /// <summary>
-    /// Attempts to find which direct dependency introduced a transitive dependency from project.assets.json.
-    /// </summary>
-    private string? FindSourcePackageFromAssets(string transitiveName, JsonElement root, List<Package> directDependencies)
-    {
-        try
+        foreach (var kvp in packageVersions)
         {
-            if (!root.TryGetProperty("targets", out var targets))
+            var distinctVersions = kvp.Value.Values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (distinctVersions.Count > 1)
             {
-                return null;
-            }
-
-            foreach (var target in targets.EnumerateObject())
-            {
-                foreach (var packageRef in target.Value.EnumerateObject())
-                {
-                    var packageName = packageRef.Name.Split('/')[0];
-
-                    // Check if this is a direct dependency
-                    if (!directDependencies.Any(d => d.Name.Equals(packageName, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        continue;
-                    }
-
-                    // Check if this package lists our transitive as a dependency
-                    if (packageRef.Value.TryGetProperty("dependencies", out var deps))
-                    {
-                        foreach (var dep in deps.EnumerateObject())
-                        {
-                            if (dep.Name.Equals(transitiveName, StringComparison.OrdinalIgnoreCase))
-                            {
-                                return packageName;
-                            }
-                        }
-                    }
-                }
+                mismatches.Add(new PackageVersionMismatch(kvp.Key, kvp.Value));
             }
         }
-        catch
-        {
-            // Silently fail
-        }
 
-        return null;
+        return mismatches;
     }
+
+    private sealed record PackageVersionMismatch(string PackageName, Dictionary<string, string> ProjectVersions);
 
     /// <summary>
     /// Counts total lines of code in all C# files included in a project, excluding blank lines and comments.

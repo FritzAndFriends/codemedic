@@ -12,6 +12,9 @@ Welcome to the CodeMedic documentation. This folder contains technical documenta
 - **[Repository Health Dashboard](feature_repository-health-dashboard.md)** - Design and implementation details for the unified health analysis system
 - **[Bill of Materials (BOM)](feature_bill-of-materials.md)** - Specification for the comprehensive dependency and vendor inventory feature
 
+### Scanning & Analysis
+- **[NuGet Scanning Architecture](nuget_scanning_architecture.md)** - Design and implementation of NuGet package discovery, resolution, and analysis including central package management support and version mismatch detection
+
 ### Implementation Details
 - **[CLI Skeleton Implementation](cli_skeleton_implementation.md)** - Details of the initial CLI implementation including command handling and console rendering
 - **[CLI Skeleton Test Results](cli_skeleton_test_results.md)** - Test results and validation of the CLI skeleton functionality
