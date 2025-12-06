@@ -52,9 +52,7 @@ public class ConsoleRenderer : IRenderer
         table.AddColumn("Description");
 
         table.AddRow("[cyan]health[/]", "Display repository health dashboard");
-
-				// Don't output BOM feature until its built
-        // table.AddRow("[cyan]bom[/]", "Generate bill of materials report");
+        table.AddRow("[cyan]bom[/]", "Generate bill of materials report");
         table.AddRow("[cyan]version[/] or [cyan]-v[/], [cyan]--version[/]", "Display application version");
         table.AddRow("[cyan]help[/] or [cyan]-h[/], [cyan]--help[/]", "Display this help message");
 
@@ -75,9 +73,8 @@ public class ConsoleRenderer : IRenderer
         AnsiConsole.MarkupLine("  [green]codemedic health[/]");
         AnsiConsole.MarkupLine("  [green]codemedic health --format markdown[/]");
         AnsiConsole.MarkupLine("  [green]codemedic health --format md > report.md[/]");
-
-				// Don't output BOM feature until its built
-        // AnsiConsole.MarkupLine("  [green]codemedic bom --format json[/]");
+        AnsiConsole.MarkupLine("  [green]codemedic bom[/]");
+        AnsiConsole.MarkupLine("  [green]codemedic bom --format markdown[/]");
         AnsiConsole.MarkupLine("  [green]codemedic --version[/]");
     }
 

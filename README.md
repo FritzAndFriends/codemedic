@@ -45,19 +45,25 @@ dotnet run -- --help
 - ✅ Docker containerization with automated versioning
 - ✅ Rich formatted console output
 - ✅ Proper error handling with exit codes
-- ✅ Extensible architecture for future commands
+- ✅ Extensible plugin architecture
+- ✅ Repository health analysis
+- ✅ Bill of Materials (BOM) generation
+- ✅ Multiple output formats (console, markdown)
 
 ## 🎯 Current Commands
 
 ```bash
+# General commands
 codemedic                # Show help (default)
 codemedic --help         # Explicit help
-codemedic -h             # Short help flag
-codemedic help           # Help keyword
-
 codemedic --version      # Show version
-codemedic -v             # Short version flag
-codemedic version        # Version keyword
+
+# Analysis commands
+codemedic health         # Repository health dashboard
+codemedic health --format markdown
+
+codemedic bom            # Bill of Materials
+codemedic bom --format md > bom.md
 ```
 
 ## 🔧 Technology Stack
@@ -73,9 +79,21 @@ codemedic version        # Version keyword
 - ✅ Help and version commands working
 - ✅ Error handling and exit codes proper
 - ✅ Documentation complete
-- ⏳ Health dashboard command (ready for implementation)
-- ⏳ Bill of materials command (ready for implementation)
-- ⏳ Plugin system (ready for implementation)
+- ✅ Plugin architecture implemented
+- ✅ Health dashboard command (internal plugin)
+- ✅ Bill of materials command (internal plugin)
+- ✅ Repository scanner with NuGet inspection
+- ✅ Multiple output formats (console, markdown)
+
+## 🔌 Plugin Architecture
+
+CodeMedic uses an extensible plugin system for analysis engines:
+
+**Current Plugins:**
+- **HealthAnalysisPlugin** - Repository health and code quality analysis
+- **BomAnalysisPlugin** - Bill of Materials generation
+
+See `doc/plugin_architecture.md` for details on creating custom plugins.
 
 ## 🛠️ Next Steps
 
