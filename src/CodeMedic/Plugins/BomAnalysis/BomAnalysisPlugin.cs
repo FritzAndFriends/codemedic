@@ -70,33 +70,19 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         ];
     }
 
-    private async Task<int> ExecuteBomCommandAsync(string[] args)
+    private async Task<int> ExecuteBomCommandAsync(string[] args, IRenderer renderer)
     {
         try
         {
-            // Parse arguments
+            // Parse arguments (target path only)
             string? targetPath = null;
-            string format = "console";
-
             for (int i = 0; i < args.Length; i++)
             {
-                if (args[i] == "--format" && i + 1 < args.Length)
-                {
-                    format = args[i + 1].ToLower();
-                    i++;
-                }
-                else if (!args[i].StartsWith("--"))
+                if (!args[i].StartsWith("--"))
                 {
                     targetPath = args[i];
                 }
             }
-
-            // Create renderer
-            IRenderer renderer = format switch
-            {
-                "markdown" or "md" => new MarkdownRenderer(),
-                _ => new ConsoleRenderer()
-            };
 
             // Render banner and header
             renderer.RenderBanner();
@@ -120,8 +106,7 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         }
         catch (Exception ex)
         {
-            var renderer = new ConsoleRenderer();
-            renderer.RenderError($"Failed to generate BOM: {ex.Message}");
+            CodeMedic.Commands.RootCommandHandler.Console.RenderError($"Failed to generate BOM: {ex.Message}");
             return 1;
         }
     }

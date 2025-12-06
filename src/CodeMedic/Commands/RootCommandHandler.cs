@@ -12,6 +12,11 @@ public class RootCommandHandler
 {
     private static PluginLoader? _pluginLoader;
 
+		/// <summary>
+		/// Gets a console renderer for providing feedback to the user.
+		/// </summary>
+    public static readonly ConsoleRenderer Console = new ConsoleRenderer();
+
     /// <summary>
     /// Processes command-line arguments and executes appropriate handler.
     /// </summary>
@@ -46,9 +51,25 @@ public class RootCommandHandler
         
         if (commandRegistration != null)
         {
-            // Execute the plugin's command handler
-            var commandArgs = args.Skip(1).ToArray();
-            return await commandRegistration.Handler(commandArgs);
+            // Parse --format argument (default: console)
+            string format = "console";
+            var commandArgsList = args.Skip(1).ToList();
+            for (int i = 0; i < commandArgsList.Count; i++)
+            {
+                if (commandArgsList[i] == "--format" && i + 1 < commandArgsList.Count)
+                {
+                    format = commandArgsList[i + 1].ToLower();
+                    commandArgsList.RemoveAt(i + 1);
+                    commandArgsList.RemoveAt(i);
+                    break;
+                }
+            }
+            IRenderer renderer = format switch
+            {
+                "markdown" or "md" => new MarkdownRenderer(),
+                _ => new ConsoleRenderer()
+            };
+            return await commandRegistration.Handler(commandArgsList.ToArray(), renderer);
         }
 
         // Unknown command

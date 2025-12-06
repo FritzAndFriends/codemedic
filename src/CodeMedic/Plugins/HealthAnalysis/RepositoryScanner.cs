@@ -72,8 +72,9 @@ public class RepositoryScanner
     /// <summary>
     /// Generates a report document from the scanned projects.
     /// </summary>
+    /// <param name="limitPackageLists">When true, truncate large package lists (for console output); when false, include all entries.</param>
     /// <returns>A structured report document ready for rendering.</returns>
-    public ReportDocument GenerateReport()
+    public ReportDocument GenerateReport(bool limitPackageLists = true)
     {
         var report = new ReportDocument
         {
@@ -302,12 +303,16 @@ public class RepositoryScanner
                         Title = $"NuGet Packages ({project.PackageDependencies.Count})"
                     };
 
-                    foreach (var pkg in project.PackageDependencies.Take(5))
+                    var packagesToRender = limitPackageLists
+                        ? project.PackageDependencies.Take(5)
+                        : project.PackageDependencies;
+
+                    foreach (var pkg in packagesToRender)
                     {
                         packagesList.AddItem($"{pkg.Name} ({pkg.Version})");
                     }
 
-                    if (project.PackageDependencies.Count > 5)
+                    if (limitPackageLists && project.PackageDependencies.Count > 5)
                     {
                         packagesList.AddItem($"... and {project.PackageDependencies.Count - 5} more");
                     }
@@ -344,7 +349,11 @@ public class RepositoryScanner
                         Title = $"Transitive Dependencies ({project.TransitiveDependencies.Count})"
                     };
 
-                    foreach (var transDep in project.TransitiveDependencies.Take(5))
+                    var transitiveDepsToRender = limitPackageLists
+                        ? project.TransitiveDependencies.Take(5)
+                        : project.TransitiveDependencies;
+
+                    foreach (var transDep in transitiveDepsToRender)
                     {
                         var depLabel = $"{transDep.PackageName} ({transDep.Version})";
                         if (transDep.IsPrivate)
@@ -354,7 +363,7 @@ public class RepositoryScanner
                         transitiveDeps.AddItem(depLabel);
                     }
 
-                    if (project.TransitiveDependencies.Count > 5)
+                    if (limitPackageLists && project.TransitiveDependencies.Count > 5)
                     {
                         transitiveDeps.AddItem($"... and {project.TransitiveDependencies.Count - 5} more");
                     }

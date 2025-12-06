@@ -12,6 +12,7 @@ namespace CodeMedic.Plugins.HealthAnalysis;
 public class HealthAnalysisPlugin : IAnalysisEnginePlugin
 {
     private RepositoryScanner? _scanner;
+    private bool _limitPackageLists = true;
 
     /// <inheritdoc/>
     public PluginMetadata Metadata => new()
@@ -41,7 +42,7 @@ public class HealthAnalysisPlugin : IAnalysisEnginePlugin
         await _scanner.ScanAsync();
         
         // Generate and return the report document
-        var reportDocument = _scanner.GenerateReport();
+        var reportDocument = _scanner.GenerateReport(_limitPackageLists);
         return reportDocument;
     }
 
@@ -65,33 +66,21 @@ public class HealthAnalysisPlugin : IAnalysisEnginePlugin
         ];
     }
 
-    private async Task<int> ExecuteHealthCommandAsync(string[] args)
+    private async Task<int> ExecuteHealthCommandAsync(string[] args, IRenderer renderer)
     {
         try
         {
-            // Parse arguments
+            // Parse arguments (target path only)
             string? targetPath = null;
-            string format = "console";
-
             for (int i = 0; i < args.Length; i++)
             {
-                if (args[i] == "--format" && i + 1 < args.Length)
-                {
-                    format = args[i + 1].ToLower();
-                    i++;
-                }
-                else if (!args[i].StartsWith("--"))
+                if (!args[i].StartsWith("--"))
                 {
                     targetPath = args[i];
                 }
             }
 
-            // Create renderer
-            IRenderer renderer = format switch
-            {
-                "markdown" or "md" => new MarkdownRenderer(),
-                _ => new ConsoleRenderer()
-            };
+            _limitPackageLists = renderer is ConsoleRenderer;
 
             // Render banner and header
             renderer.RenderBanner();
@@ -115,8 +104,7 @@ public class HealthAnalysisPlugin : IAnalysisEnginePlugin
         }
         catch (Exception ex)
         {
-            var renderer = new ConsoleRenderer();
-            renderer.RenderError($"Failed to analyze repository: {ex.Message}");
+            CodeMedic.Commands.RootCommandHandler.Console.RenderError($"Failed to analyze repository: {ex.Message}");
             return 1;
         }
     }
