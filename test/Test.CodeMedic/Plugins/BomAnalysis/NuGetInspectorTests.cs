@@ -12,13 +12,36 @@ namespace Test.CodeMedic.Plugins.BomAnalysis;
 /// </summary>
 public class NuGetInspectorTests
 {
+    /// <summary>
+    /// Gets a cross-platform root path for testing.
+    /// Uses /tmp/TestRepo on Unix and C:\TestRepo on Windows.
+    /// </summary>
+    private static string TestRootPath => OperatingSystem.IsWindows() 
+        ? @"C:\TestRepo" 
+        : "/tmp/TestRepo";
+
+    /// <summary>
+    /// Gets a cross-platform project directory path for testing.
+    /// </summary>
+    private static string TestProjectDirectory => Path.Combine(TestRootPath, "src", "MyProject");
+
+    /// <summary>
+    /// Gets a cross-platform project file path for testing.
+    /// </summary>
+    private static string TestProjectFilePath => Path.Combine(TestProjectDirectory, "MyProject.csproj");
+
+    /// <summary>
+    /// Gets a cross-platform Directory.Packages.props path for testing.
+    /// </summary>
+    private static string TestPropsPath => Path.Combine(TestRootPath, "Directory.Packages.props");
+
     #region Constructor Tests
 
     [Fact]
     public void Constructor_GivenValidRootPath_WhenCreatingInspector_ThenInitializesSuccessfully()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
+        var rootPath = TestRootPath;
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
             It.IsAny<string>(),
@@ -58,9 +81,9 @@ public class NuGetInspectorTests
     public void RefreshCentralPackageVersionFiles_GivenDirectoryPackagesPropsExists_WhenRefreshing_ThenFindsFiles()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
+        var rootPath = TestRootPath;
         var mockFileSystem = new Mock<IFileSystem>();
-        var propsFiles = new[] { @"C:\TestRepo\Directory.Packages.props" };
+        var propsFiles = new[] { TestPropsPath };
         
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
             It.IsAny<string>(),
@@ -84,7 +107,7 @@ public class NuGetInspectorTests
     public void RefreshCentralPackageVersionFiles_GivenFileSystemThrowsException_WhenRefreshing_ThenHandlesGracefully()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
+        var rootPath = TestRootPath;
         var mockFileSystem = new Mock<IFileSystem>();
         var callCount = 0;
         
@@ -119,8 +142,8 @@ public class NuGetInspectorTests
     public void ReadPackageReferences_GivenProjectWithDirectVersions_WhenReading_ThenReturnsPackagesWithVersions()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectDirectory = @"C:\TestRepo\src\MyProject";
+        var rootPath = TestRootPath;
+        var projectDirectory = TestProjectDirectory;
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
             It.IsAny<string>(),
@@ -153,8 +176,8 @@ public class NuGetInspectorTests
     public void ReadPackageReferences_GivenPackageWithVersionElement_WhenReading_ThenReadsVersionFromElement()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectDirectory = @"C:\TestRepo\src\MyProject";
+        var rootPath = TestRootPath;
+        var projectDirectory = TestProjectDirectory;
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
             It.IsAny<string>(),
@@ -188,8 +211,8 @@ public class NuGetInspectorTests
     public void ReadPackageReferences_GivenPackageWithUpdateAttribute_WhenReading_ThenUsesUpdateAttribute()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectDirectory = @"C:\TestRepo\src\MyProject";
+        var rootPath = TestRootPath;
+        var projectDirectory = TestProjectDirectory;
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
             It.IsAny<string>(),
@@ -221,9 +244,9 @@ public class NuGetInspectorTests
     public void ReadPackageReferences_GivenPackageWithCentralVersionManagement_WhenReading_ThenResolvesCentralVersion()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectDirectory = @"C:\TestRepo\src\MyProject";
-        var propsPath = @"C:\TestRepo\Directory.Packages.props";
+        var rootPath = TestRootPath;
+        var projectDirectory = TestProjectDirectory;
+        var propsPath = TestPropsPath;
         
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
@@ -267,8 +290,8 @@ public class NuGetInspectorTests
     public void ReadPackageReferences_GivenPackageWithMissingVersion_WhenNoCentralVersion_ThenReturnsUnknownVersion()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectDirectory = @"C:\TestRepo\src\MyProject";
+        var rootPath = TestRootPath;
+        var projectDirectory = TestProjectDirectory;
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
             It.IsAny<string>(),
@@ -300,8 +323,8 @@ public class NuGetInspectorTests
     public void ReadPackageReferences_GivenEmptyProject_WhenReading_ThenReturnsEmptyList()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectDirectory = @"C:\TestRepo\src\MyProject";
+        var rootPath = TestRootPath;
+        var projectDirectory = TestProjectDirectory;
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
             It.IsAny<string>(),
@@ -335,9 +358,9 @@ public class NuGetInspectorTests
     public void ExtractTransitiveDependencies_GivenLockFileExists_WhenExtracting_ThenReturnsTransitiveDependencies()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectFilePath = @"C:\TestRepo\src\MyProject\MyProject.csproj";
-        var lockFilePath = @"C:\TestRepo\src\MyProject\packages.lock.json";
+        var rootPath = TestRootPath;
+        var projectFilePath = TestProjectFilePath;
+        var lockFilePath = Path.Combine(TestProjectDirectory, "packages.lock.json");
         
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
@@ -392,10 +415,10 @@ public class NuGetInspectorTests
     public void ExtractTransitiveDependencies_GivenAssetsFileExists_WhenNoLockFile_ThenReadsFromAssetsFile()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectFilePath = @"C:\TestRepo\src\MyProject\MyProject.csproj";
-        var lockFilePath = @"C:\TestRepo\src\MyProject\packages.lock.json";
-        var assetsFilePath = @"C:\TestRepo\src\MyProject\obj\project.assets.json";
+        var rootPath = TestRootPath;
+        var projectFilePath = TestProjectFilePath;
+        var lockFilePath = Path.Combine(TestProjectDirectory, "packages.lock.json");
+        var assetsFilePath = Path.Combine(TestProjectDirectory, "obj", "project.assets.json");
         
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
@@ -455,9 +478,9 @@ public class NuGetInspectorTests
     public void ExtractTransitiveDependencies_GivenProjectReferences_WhenExtracting_ThenExcludesProjectReferences()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectFilePath = @"C:\TestRepo\src\MyProject\MyProject.csproj";
-        var lockFilePath = @"C:\TestRepo\src\MyProject\packages.lock.json";
+        var rootPath = TestRootPath;
+        var projectFilePath = TestProjectFilePath;
+        var lockFilePath = Path.Combine(TestProjectDirectory, "packages.lock.json");
         
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
@@ -508,8 +531,8 @@ public class NuGetInspectorTests
     public void ExtractTransitiveDependencies_GivenNoLockOrAssetsFile_WhenExtracting_ThenReturnsEmptyList()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectFilePath = @"C:\TestRepo\src\MyProject\MyProject.csproj";
+        var rootPath = TestRootPath;
+        var projectFilePath = TestProjectFilePath;
         
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
@@ -538,9 +561,9 @@ public class NuGetInspectorTests
     public void ExtractTransitiveDependencies_GivenDirectDependencies_WhenExtracting_ThenExcludesDirectDependencies()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectFilePath = @"C:\TestRepo\src\MyProject\MyProject.csproj";
-        var lockFilePath = @"C:\TestRepo\src\MyProject\packages.lock.json";
+        var rootPath = TestRootPath;
+        var projectFilePath = TestProjectFilePath;
+        var lockFilePath = Path.Combine(TestProjectDirectory, "packages.lock.json");
         
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
@@ -593,10 +616,10 @@ public class NuGetInspectorTests
     public void ReadPackageReferences_GivenNestedDirectoryPackagesProps_WhenReading_ThenUsesClosestPropsFile()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectDirectory = @"C:\TestRepo\src\MyProject";
-        var rootPropsPath = @"C:\TestRepo\Directory.Packages.props";
-        var srcPropsPath = @"C:\TestRepo\src\Directory.Packages.props";
+        var rootPath = TestRootPath;
+        var projectDirectory = TestProjectDirectory;
+        var rootPropsPath = Path.Combine(rootPath, "Directory.Packages.props");
+        var srcPropsPath = Path.Combine(rootPath, "src", "Directory.Packages.props");
         
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
@@ -650,9 +673,9 @@ public class NuGetInspectorTests
     public void ReadPackageReferences_GivenVersionOverride_WhenReading_ThenUsesVersionOverride()
     {
         // Given
-        var rootPath = @"C:\TestRepo";
-        var projectDirectory = @"C:\TestRepo\src\MyProject";
-        var propsPath = @"C:\TestRepo\Directory.Packages.props";
+        var rootPath = TestRootPath;
+        var projectDirectory = TestProjectDirectory;
+        var propsPath = TestPropsPath;
         
         var mockFileSystem = new Mock<IFileSystem>();
         mockFileSystem.Setup(fs => fs.EnumerateFiles(
