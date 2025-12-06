@@ -6,7 +6,7 @@ using CodeMedic.Models.Report;
 using CodeMedic.Output;
 using CodeMedic.Utilities;
 
-namespace CodeMedic.Plugins;
+namespace CodeMedic.Plugins.BomAnalysis;
 
 /// <summary>
 /// Internal plugin that provides Bill of Materials (BOM) analysis for .NET repositories.

@@ -5,7 +5,7 @@ using CodeMedic.Engines;
 using CodeMedic.Models;
 using Moq;
 
-namespace Test.CodeMedic.Engines;
+namespace Test.CodeMedic.Plugins.BomAnalysis;
 
 /// <summary>
 /// Unit tests for NuGetInspector using Given-When-Then syntax.

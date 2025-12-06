@@ -1,11 +1,10 @@
 using CodeMedic.Abstractions;
 using CodeMedic.Abstractions.Plugins;
-using CodeMedic.Engines;
 using CodeMedic.Models.Report;
 using CodeMedic.Output;
 using CodeMedic.Utilities;
 
-namespace CodeMedic.Plugins;
+namespace CodeMedic.Plugins.HealthAnalysis;
 
 /// <summary>
 /// Internal plugin that provides repository health analysis.
