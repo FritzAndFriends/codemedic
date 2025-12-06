@@ -67,6 +67,11 @@ public class ProjectInfo
     public bool GeneratesDocumentation { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether this is a test project.
+    /// </summary>
+    public bool IsTestProject { get; set; }
+
+    /// <summary>
     /// Gets or sets any parsing errors encountered while reading the project.
     /// </summary>
     public List<string> ParseErrors { get; set; } = [];
