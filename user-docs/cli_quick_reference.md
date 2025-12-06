@@ -2,12 +2,13 @@
 
 ## Commands
 
-| Command | Aliases | Purpose |
-|---------|---------|---------|
-| `help` | `-h`, `--help` | Display help and available commands |
-| `version` | `-v`, `--version` | Display application version |
-| `health` | - | Display repository health dashboard *(coming soon)* |
-| `bom` | - | Generate bill of materials report *(coming soon)* |
+| Command | Purpose |
+|---------|---------|
+| `help` | Display help and available commands |
+| `version` | Display application version |
+| `health` | Display repository health dashboard |
+| `bom` | Generate bill of materials report |
+| `vulnerabilities` | Scan for known vulnerabilities in NuGet packages |
 
 ## Basic Usage
 
@@ -23,14 +24,33 @@ codemedic version
 codemedic --version
 codemedic -v
 
-# Repository health analysis (coming soon)
+# Repository health analysis
 codemedic health
-codemedic health --format json
+codemedic health --format markdown > report.md
 
-# Bill of materials (coming soon)
+# Bill of materials
 codemedic bom
 codemedic bom --format json
 codemedic bom --format markdown
+
+# Vulnerability scanning
+codemedic vulnerabilities
+codemedic vulnerabilities --format markdown > vulnerabilities-report.md
+codemedic vulnerabilities /path/to/repo
+```
+
+## Output Formats
+
+All commands support `--format` option:
+- `console` (default) - Rich formatted output for terminal
+- `markdown` or `md` - Markdown format suitable for reports and documentation
+
+```bash
+# Console output (default)
+codemedic health
+
+# Markdown output
+codemedic health --format markdown > report.md
 ```
 
 ## Installation & Running
@@ -45,29 +65,36 @@ cd src/CodeMedic
 dotnet build -c Release
 ```
 
-### Run
-```bash
-# Via dotnet
-dotnet run -- --help
+### Run via Scripts
 
-# Direct binary (after build)
-./bin/Debug/net10.0/CodeMedic.exe --help
+**Windows (PowerShell):**
+```powershell
+.\run-health.ps1
+.\run-vulnerabilities.ps1
 ```
 
-## Output Examples
+**macOS/Linux (Bash):**
+```bash
+./run-health.sh
+./run-vulnerabilities.sh
+```
 
-### Help Screen
-- Rich formatted table showing all available commands
-- Usage examples
-- Quick reference for common tasks
+### Run via dotnet
 
-### Version Info
-- Application name and version
-- Description of the tool
+```bash
+# Health dashboard
+dotnet ./src/CodeMedic/bin/Release/net10.0/CodeMedic.dll health
+
+# Vulnerability scan
+dotnet ./src/CodeMedic/bin/Release/net10.0/CodeMedic.dll vulnerabilities
+
+# Bill of materials
+dotnet ./src/CodeMedic/bin/Release/net10.0/CodeMedic.dll bom
+```
 
 ## Exit Codes
 - `0` - Success
-- `1` - Error (e.g., unknown command)
+- `1` - Error (e.g., unknown command, scan failure)
 
 ## Cross-Platform Support
 All output is automatically formatted for:

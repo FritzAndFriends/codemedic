@@ -11,7 +11,8 @@ namespace CodeMedic.Plugins.HealthAnalysis;
 public class RepositoryScanner
 {
     private readonly string _rootPath;
-        private readonly NuGetInspector _nugetInspector;
+    private readonly NuGetInspector _nugetInspector;
+    private readonly VulnerabilityScanner _vulnerabilityScanner;
     private readonly List<ProjectInfo> _projects = [];
 
     /// <summary>
@@ -23,7 +24,8 @@ public class RepositoryScanner
         _rootPath = string.IsNullOrWhiteSpace(rootPath) 
             ? Directory.GetCurrentDirectory() 
             : Path.GetFullPath(rootPath);
-            _nugetInspector = new NuGetInspector(_rootPath);
+        _nugetInspector = new NuGetInspector(_rootPath);
+        _vulnerabilityScanner = new VulnerabilityScanner(_rootPath);
     }
 
     /// <summary>
@@ -49,6 +51,9 @@ public class RepositoryScanner
             {
                 await ParseProjectAsync(projectFile);
             }
+
+            // Scan for vulnerabilities after all projects are parsed
+            await CollectVulnerabilitiesAsync();
         }
         catch (Exception ex)
         {
@@ -96,6 +101,13 @@ public class RepositoryScanner
         var projectsWithErrors = _projects.Where(p => p.ParseErrors.Count > 0).ToList();
         var versionMismatches = FindPackageVersionMismatches();
 
+        // Collect vulnerabilities early for summary metrics
+        var allVulnerabilities = _projects
+            .Where(p => p.Metadata.ContainsKey("Vulnerabilities"))
+            .SelectMany(p => (List<PackageVulnerability>)p.Metadata["Vulnerabilities"])
+            .Distinct()
+            .ToList();
+
         // Summary section
         var summarySection = new ReportSection
         {
@@ -125,6 +137,8 @@ public class RepositoryScanner
                     testCoverageRatio >= 0.3 ? TextStyle.Success : TextStyle.Warning);
             }
             summaryKvList.Add("Total NuGet Packages", totalPackages.ToString());
+            summaryKvList.Add("Known Vulnerabilities", allVulnerabilities.Count.ToString(),
+                allVulnerabilities.Count == 0 ? TextStyle.Success : TextStyle.Warning);
             summaryKvList.Add("Projects without Nullable", (totalProjects - projectsWithNullable).ToString(),
                 (totalProjects - projectsWithNullable) == 0 ? TextStyle.Success : TextStyle.Warning);
             summaryKvList.Add("Projects without Implicit Usings", (totalProjects - projectsWithImplicitUsings).ToString(),
@@ -164,6 +178,72 @@ public class RepositoryScanner
 
             mismatchSection.AddElement(mismatchList);
             report.AddSection(mismatchSection);
+        }
+
+        // Vulnerabilities section
+        if (allVulnerabilities.Count > 0)
+        {
+            var vulnSection = new ReportSection
+            {
+                Title = "Known Vulnerabilities",
+                Level = 1
+            };
+
+            vulnSection.AddElement(new ReportParagraph(
+                $"Found {allVulnerabilities.Count} package(s) with known vulnerabilities. Review and update affected packages.",
+                TextStyle.Warning));
+
+            // Group by severity
+            var bySeverity = allVulnerabilities.GroupBy(v => v.Severity).OrderByDescending(g => GetSeverityOrder(g.Key));
+
+            foreach (var severityGroup in bySeverity)
+            {
+                var sevTable = new ReportTable
+                {
+                    Title = $"Vulnerabilities - {severityGroup.Key}"
+                };
+
+                sevTable.Headers.AddRange(new[]
+                {
+                    "Package",
+                    "Version",
+                    "CVE ID",
+                    "Description",
+                    "Fixed In",
+                    "Published"
+                });
+
+                foreach (var vuln in severityGroup.OrderBy(v => v.PackageName))
+                {
+                    sevTable.AddRow(
+                        vuln.PackageName,
+                        vuln.AffectedVersion,
+                        vuln.VulnerabilityId,
+                        vuln.Description,
+                        vuln.FixedInVersion ?? "Unknown",
+                        vuln.PublishedDate?.ToString("yyyy-MM-dd") ?? "Unknown"
+                    );
+                }
+
+                vulnSection.AddElement(sevTable);
+            }
+
+            report.AddSection(vulnSection);
+        }
+        else
+        {
+            var noVulnSection = new ReportSection
+            {
+                Title = "Security Status",
+                Level = 1
+            };
+
+            noVulnSection.AddElement(new ReportParagraph(
+                "✓ No known vulnerabilities detected in any packages!",
+                TextStyle.Success
+            ));
+
+            report.AddSection(noVulnSection);
         }
 
         // Projects table section
@@ -612,6 +692,46 @@ public class RepositoryScanner
         return mismatches;
     }
 
+    /// <summary>
+    /// Collects vulnerability information for all packages across all projects.
+    /// </summary>
+    private async Task CollectVulnerabilitiesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            foreach (var project in _projects)
+            {
+                if (project.PackageDependencies.Count == 0)
+                {
+                    continue;
+                }
+
+                foreach (var package in project.PackageDependencies)
+                {
+                    var vulnerabilities = await _vulnerabilityScanner.ScanPackageAsync(
+                        package.Name,
+                        package.Version,
+                        cancellationToken);
+
+                    if (vulnerabilities.Count > 0)
+                    {
+                        if (!project.Metadata.ContainsKey("Vulnerabilities"))
+                        {
+                            project.Metadata["Vulnerabilities"] = new List<PackageVulnerability>();
+                        }
+
+                        var vulnList = (List<PackageVulnerability>)project.Metadata["Vulnerabilities"];
+                        vulnList.AddRange(vulnerabilities);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: Vulnerability scanning failed: {ex.Message}");
+        }
+    }
+
     private sealed record PackageVersionMismatch(string PackageName, Dictionary<string, string> ProjectVersions);
 
     /// <summary>
@@ -705,4 +825,16 @@ public class RepositoryScanner
 
         return codeLines;
     }
+
+    /// <summary>
+    /// Gets the severity ordering value for vulnerability grouping (higher values = more severe).
+    /// </summary>
+    private static int GetSeverityOrder(string severity) => severity.ToLower() switch
+    {
+        "critical" => 4,
+        "high" => 3,
+        "moderate" => 2,
+        "low" => 1,
+        _ => 0
+    };
 }

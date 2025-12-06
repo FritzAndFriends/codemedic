@@ -11,6 +11,7 @@ Welcome to the CodeMedic documentation. This folder contains technical documenta
 ### Features
 - **[Repository Health Dashboard](feature_repository-health-dashboard.md)** - Design and implementation details for the unified health analysis system
 - **[Bill of Materials (BOM)](feature_bill-of-materials.md)** - Specification for the comprehensive dependency and vendor inventory feature
+- **[Vulnerability Scanning](feature_vulnerability-scanning.md)** - Security-focused NuGet package vulnerability analysis and reporting
 
 ### Scanning & Analysis
 - **[NuGet Scanning Architecture](nuget_scanning_architecture.md)** - Design and implementation of NuGet package discovery, resolution, and analysis including central package management support and version mismatch detection

@@ -88,17 +88,18 @@ public class HealthAnalysisPlugin : IAnalysisEnginePlugin
 
             // Run analysis
             var repositoryPath = targetPath ?? Directory.GetCurrentDirectory();
-            object reportDocument;
+            object? reportDocument = null;
 
             await renderer.RenderWaitAsync($"Running {AnalysisDescription}...", async () =>
             {
                 reportDocument = await AnalyzeAsync(repositoryPath);
             });
 
-            reportDocument = await AnalyzeAsync(repositoryPath);
-
             // Render report
-            renderer.RenderReport(reportDocument);
+            if (reportDocument != null)
+            {
+                renderer.RenderReport(reportDocument);
+            }
 
             return 0;
         }

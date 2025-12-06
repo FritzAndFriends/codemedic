@@ -48,6 +48,7 @@ dotnet run -- --help
 - ✅ Extensible plugin architecture
 - ✅ Repository health analysis
 - ✅ Bill of Materials (BOM) generation
+- ✅ NuGet package vulnerability scanning
 - ✅ Multiple output formats (console, markdown)
 
 ## 🎯 Current Commands
@@ -64,6 +65,9 @@ codemedic health --format markdown
 
 codemedic bom            # Bill of Materials
 codemedic bom --format md > bom.md
+
+codemedic vulnerabilities        # Scan for NuGet vulnerabilities
+codemedic vulnerabilities --format markdown > vulns.md
 ```
 
 ## 🔧 Technology Stack
@@ -84,6 +88,8 @@ codemedic bom --format md > bom.md
 - ✅ Bill of materials command (internal plugin)
 - ✅ Repository scanner with NuGet inspection
 - ✅ Multiple output formats (console, markdown)
+- ✅ Vulnerability scanning for NuGet packages
+- ✅ Dedicated vulnerability analysis command
 
 ## 🔌 Plugin Architecture
 
@@ -92,6 +98,7 @@ CodeMedic uses an extensible plugin system for analysis engines:
 **Current Plugins:**
 - **HealthAnalysisPlugin** - Repository health and code quality analysis
 - **BomAnalysisPlugin** - Bill of Materials generation
+- **VulnerabilityAnalysisPlugin** - NuGet package vulnerability scanning
 
 See `doc/plugin_architecture.md` for details on creating custom plugins.
 

@@ -82,6 +82,11 @@ public class ProjectInfo
     public int TotalLinesOfCode { get; set; }
 
     /// <summary>
+    /// Gets or sets metadata dictionary for storing additional analysis data including vulnerabilities.
+    /// </summary>
+    public Dictionary<string, object> Metadata { get; set; } = [];
+
+    /// <summary>
     /// Gets the display name for the project.
     /// </summary>
     public string DisplayName => $"{ProjectName} ({RelativePath})";
