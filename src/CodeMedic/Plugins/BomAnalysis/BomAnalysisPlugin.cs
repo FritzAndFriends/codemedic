@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Xml.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CodeMedic.Abstractions;
 using CodeMedic.Abstractions.Plugins;
 using CodeMedic.Engines;
@@ -244,23 +245,52 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         // Fetch license information for all packages
         await FetchLicenseInformationAsync(allPackages.Values);
 
+        // Fetch latest version information for all packages
+        await FetchLatestVersionInformationAsync(allPackages.Values);
+
         // Create packages table
         var packagesTable = new ReportTable
         {
             Title = "All Packages"
         };
 
-        packagesTable.Headers.AddRange(["Package", "Version", "Type", "License", "Source Type", "Commercial", "Used In"]);
+        packagesTable.Headers.AddRange(["Package", "Version", "Latest", "Type", "License", "Source", "Comm", "Used In"]);
 
         foreach (var package in allPackages.Values.OrderBy(p => p.Name))
         {
+            var latestVersionDisplay = package.LatestVersion ?? "Unknown";
+            if (package.HasNewerVersion)
+            {
+                latestVersionDisplay = $"^ {package.LatestVersion}";
+            }
+            else if (!string.IsNullOrEmpty(package.LatestVersion) && 
+                     string.Equals(package.Version, package.LatestVersion, StringComparison.OrdinalIgnoreCase))
+            {
+                latestVersionDisplay = "Current";
+            }
+
+            // Truncate package names if too long to improve table formatting
+            var displayName = package.Name.Length > 25 ? package.Name.Substring(0, 22) + "..." : package.Name;
+            
+            // Shorten source type and commercial status for better formatting
+            var sourceType = package.SourceType == "Open Source" ? "Open" : 
+                            package.SourceType == "Closed Source" ? "Closed" : 
+                            package.SourceType;
+            
+            var commercial = package.Commercial == "Unknown" ? "?" : 
+                           package.Commercial == "Yes" ? "Y" : "N";
+            
+            // Truncate license if too long
+            var license = package.License?.Length > 12 ? package.License.Substring(0, 9) + "..." : package.License ?? "Unknown";
+
             packagesTable.AddRow(
-                package.Name,
+                displayName,
                 package.Version,
-                package.IsDirect ? "Direct" : "Transitive",
-                package.License ?? "Unknown",
-                package.SourceType,
-                package.Commercial,
+                latestVersionDisplay,
+                package.IsDirect ? "Direct" : "Trans",
+                license,
+                sourceType,
+                commercial,
                 string.Join(", ", package.Projects.Distinct())
             );
         }
@@ -269,6 +299,7 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         summaryKvList.Add("Total Unique Packages", allPackages.Count.ToString());
         summaryKvList.Add("Direct Dependencies", allPackages.Values.Count(p => p.IsDirect).ToString());
         summaryKvList.Add("Transitive Dependencies", allPackages.Values.Count(p => !p.IsDirect).ToString());
+        summaryKvList.Add("Packages with Updates", allPackages.Values.Count(p => p.HasNewerVersion).ToString());
 
         packagesSection.AddElement(summaryKvList);
         packagesSection.AddElement(packagesTable);
@@ -347,6 +378,106 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         });
 
         await Task.WhenAll(tasks);
+    }
+
+    /// <summary>
+    /// Fetches latest version information for packages using 'dotnet nuget search'.
+    /// </summary>
+    private async Task FetchLatestVersionInformationAsync(IEnumerable<PackageInfo> packages)
+    {
+        // Limit concurrent operations to avoid overwhelming the NuGet service
+        const int maxConcurrency = 5;
+        var semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+        
+        var tasks = packages.Select(async package =>
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                await FetchLatestVersionForPackageAsync(package);
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't fail the entire operation
+                Console.Error.WriteLine($"Warning: Could not fetch latest version for {package.Name}: {ex.Message}");
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+    }
+
+    /// <summary>
+    /// Fetches the latest version for a specific package using the NuGet API.
+    /// </summary>
+    private async Task FetchLatestVersionForPackageAsync(PackageInfo package)
+    {
+        try
+        {
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "CodeMedic/1.0");
+            httpClient.Timeout = TimeSpan.FromSeconds(10); // Set reasonable timeout
+            
+            // Use the NuGet V3 API to get package information
+            var apiUrl = $"https://api.nuget.org/v3-flatcontainer/{package.Name.ToLowerInvariant()}/index.json";
+            
+            var response = await httpClient.GetStringAsync(apiUrl);
+            var versionData = JsonSerializer.Deserialize<NuGetVersionResponse>(response, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            
+            if (versionData?.Versions?.Length > 0)
+            {
+                // Get the latest stable version (not pre-release)
+                var latestVersion = versionData.Versions
+                    .Where(v => !IsPreReleaseVersion(v))
+                    .LastOrDefault() ?? versionData.Versions.Last();
+                    
+                package.LatestVersion = latestVersion;
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            // Package might not exist on nuget.org or network issue
+            // Only log 404s for debugging, skip others as they're common for private packages
+            if (ex.Message.Contains("404"))
+            {
+                Console.Error.WriteLine($"Debug: Package {package.Name} not found on nuget.org");
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Timeout - skip silently
+        }
+        catch (JsonException ex)
+        {
+            Console.Error.WriteLine($"Warning: Failed to parse version data for {package.Name}: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            // Log other unexpected errors but don't fail - this is supplementary information
+            Console.Error.WriteLine($"Warning: Could not fetch latest version for {package.Name}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Determines if a version string represents a pre-release version.
+    /// </summary>
+    private static bool IsPreReleaseVersion(string version)
+    {
+        return version.Contains('-') || version.Contains('+');
+    }
+
+    /// <summary>
+    /// Response model for NuGet V3 API version query.
+    /// </summary>
+    private class NuGetVersionResponse
+    {
+        public string[]? Versions { get; set; }
     }
 
     /// <summary>
@@ -610,5 +741,48 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         public string? LicenseUrl { get; set; }
         public string SourceType { get; set; } = "Unknown";
         public string Commercial { get; set; } = "Unknown";
+        public string? LatestVersion { get; set; }
+        public bool HasNewerVersion => !string.IsNullOrEmpty(LatestVersion) && 
+                                      !string.Equals(Version, LatestVersion, StringComparison.OrdinalIgnoreCase) &&
+                                      IsNewerVersion(LatestVersion, Version);
+
+        private static bool IsNewerVersion(string? latestVersion, string currentVersion)
+        {
+            if (string.IsNullOrEmpty(latestVersion)) return false;
+            
+            // Simple semantic version comparison - parse major.minor.patch
+            if (TryParseVersion(currentVersion, out var currentParts) && 
+                TryParseVersion(latestVersion, out var latestParts))
+            {
+                for (int i = 0; i < Math.Min(currentParts.Length, latestParts.Length); i++)
+                {
+                    if (latestParts[i] > currentParts[i]) return true;
+                    if (latestParts[i] < currentParts[i]) return false;
+                }
+                // If all compared parts are equal, check if latest has more parts
+                return latestParts.Length > currentParts.Length;
+            }
+            
+            // Fallback to string comparison if parsing fails
+            return string.Compare(latestVersion, currentVersion, StringComparison.OrdinalIgnoreCase) > 0;
+        }
+
+        private static bool TryParseVersion(string version, out int[] parts)
+        {
+            parts = Array.Empty<int>();
+            if (string.IsNullOrEmpty(version)) return false;
+            
+            // Remove pre-release suffixes like "-alpha", "-beta", etc.
+            var cleanVersion = Regex.Replace(version, @"[-+].*$", "");
+            var versionParts = cleanVersion.Split('.');
+            
+            parts = new int[versionParts.Length];
+            for (int i = 0; i < versionParts.Length; i++)
+            {
+                if (!int.TryParse(versionParts[i], out parts[i]))
+                    return false;
+            }
+            return true;
+        }
     }
 }
