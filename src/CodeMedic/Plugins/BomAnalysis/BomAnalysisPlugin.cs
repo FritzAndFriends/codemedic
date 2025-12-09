@@ -206,11 +206,12 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
 
                 var ns = root.GetDefaultNamespace();
                 var projectDir = Path.GetDirectoryName(projectFile) ?? repositoryPath;
+                var projectName = Path.GetFileNameWithoutExtension(projectFile);
 
                 // Get direct package references
-                var packages = _inspector!.ReadPackageReferences(root, ns, projectDir);
+                var directPackages = _inspector!.ReadPackageReferences(root, ns, projectDir);
 
-                foreach (var package in packages)
+                foreach (var package in directPackages)
                 {
                     var key = $"{package.Name}@{package.Version}";
                     if (!allPackages.ContainsKey(key))
@@ -223,7 +224,26 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
                             Projects = []
                         };
                     }
-                    allPackages[key].Projects.Add(Path.GetFileNameWithoutExtension(projectFile));
+                    allPackages[key].Projects.Add(projectName);
+                }
+
+                // Get transitive dependencies using the same method as health analysis
+                var transitivePackages = _inspector.ExtractTransitiveDependencies(projectFile, directPackages.ToList(), []);
+
+                foreach (var transitive in transitivePackages)
+                {
+                    var key = $"{transitive.PackageName}@{transitive.Version}";
+                    if (!allPackages.ContainsKey(key))
+                    {
+                        allPackages[key] = new PackageInfo
+                        {
+                            Name = transitive.PackageName,
+                            Version = transitive.Version,
+                            IsDirect = false,
+                            Projects = []
+                        };
+                    }
+                    allPackages[key].Projects.Add(projectName);
                 }
             }
             catch (Exception ex)
