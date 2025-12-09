@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using CodeMedic.Abstractions;
 using CodeMedic.Abstractions.Plugins;
 using CodeMedic.Engines;
+using CodeMedic.Models;
 using CodeMedic.Models.Report;
 using CodeMedic.Output;
 using CodeMedic.Utilities;
@@ -208,8 +209,24 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
                 var projectDir = Path.GetDirectoryName(projectFile) ?? repositoryPath;
                 var projectName = Path.GetFileNameWithoutExtension(projectFile);
 
-                // Get direct package references
-                var directPackages = _inspector!.ReadPackageReferences(root, ns, projectDir);
+                // Read project references to filter them out
+                var projectReferenceElements = root.Descendants(ns + "ProjectReference").ToList();
+                var projectReferences = projectReferenceElements
+                    .Select(prElement => new ProjectReference
+                    {
+                        ProjectName = Path.GetFileNameWithoutExtension(prElement.Attribute("Include")?.Value ?? "unknown"),
+                        Path = prElement.Attribute("Include")?.Value ?? "unknown",
+                        IsPrivate = prElement.Attribute("PrivateAssets")?.Value?.ToLower() == "all",
+                        Metadata = prElement.Attribute("Condition")?.Value
+                    })
+                    .ToList();
+
+                var projectRefNames = projectReferences.Select(pr => pr.ProjectName.ToLower()).ToHashSet();
+
+                // Get direct package references and filter out project references
+                var directPackages = _inspector!.ReadPackageReferences(root, ns, projectDir)
+                    .Where(package => !projectRefNames.Contains(package.Name.ToLower()))
+                    .ToList();
 
                 foreach (var package in directPackages)
                 {
@@ -227,8 +244,8 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
                     allPackages[key].Projects.Add(projectName);
                 }
 
-                // Get transitive dependencies using the same method as health analysis
-                var transitivePackages = _inspector.ExtractTransitiveDependencies(projectFile, directPackages.ToList(), []);
+                // Get transitive dependencies using the same method as health analysis, now with proper project reference filtering
+                var transitivePackages = _inspector.ExtractTransitiveDependencies(projectFile, directPackages.ToList(), projectReferences);
 
                 foreach (var transitive in transitivePackages)
                 {
@@ -267,6 +284,9 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
 
         // Fetch latest version information for all packages
         await FetchLatestVersionInformationAsync(allPackages.Values);
+
+        // Fetch latest license information to detect changes
+        await FetchLatestLicenseInformationAsync(allPackages.Values);
 
         // Create packages table
         var packagesTable = new ReportTable
@@ -320,13 +340,55 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         summaryKvList.Add("Direct Dependencies", allPackages.Values.Count(p => p.IsDirect).ToString());
         summaryKvList.Add("Transitive Dependencies", allPackages.Values.Count(p => !p.IsDirect).ToString());
         summaryKvList.Add("Packages with Updates", allPackages.Values.Count(p => p.HasNewerVersion).ToString());
+        summaryKvList.Add("License Changes Detected", allPackages.Values.Count(p => p.HasLicenseChange).ToString());
 
         packagesSection.AddElement(summaryKvList);
         packagesSection.AddElement(packagesTable);
 
+        // Add license change warnings if any
+        var packagesWithLicenseChanges = allPackages.Values.Where(p => p.HasLicenseChange).ToList();
+        if (packagesWithLicenseChanges.Count > 0)
+        {
+            var warningSection = new ReportSection
+            {
+                Title = "License Change Warnings",
+                Level = 2
+            };
+            
+            warningSection.AddElement(new ReportParagraph(
+                "The following packages have different licenses in their latest versions:",
+                TextStyle.Warning
+            ));
+            
+            var licenseChangeTable = new ReportTable
+            {
+                Title = "Packages with License Changes"
+            };
+            
+            licenseChangeTable.Headers.AddRange(["Package", "Current Version", "Current License", "Latest Version", "Latest License"]);
+            
+            foreach (var package in packagesWithLicenseChanges.OrderBy(p => p.Name))
+            {
+                licenseChangeTable.AddRow(
+                    package.Name,
+                    package.Version,
+                    package.License ?? "Unknown",
+                    package.LatestVersion ?? "Unknown",
+                    package.LatestLicense ?? "Unknown"
+                );
+            }
+            
+            warningSection.AddElement(licenseChangeTable);
+            packagesSection.AddElement(warningSection);
+        }
+
         // Add footer with license information link
         packagesSection.AddElement(new ReportParagraph(
             "For more information about open source licenses, visit https://choosealicense.com/licenses/",
+            TextStyle.Dim
+        ));  
+        packagesSection.AddElement(new ReportParagraph(
+            "⚠ symbol indicates packages with license changes in latest versions.",
             TextStyle.Dim
         ));
 
@@ -498,6 +560,144 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
     private class NuGetVersionResponse
     {
         public string[]? Versions { get; set; }
+    }
+
+    /// <summary>
+    /// Response model for NuGet V3 API package metadata query.
+    /// </summary>
+    private class NuGetPackageResponse
+    {
+        public string? LicenseExpression { get; set; }
+        public string? LicenseUrl { get; set; }
+    }
+
+    /// <summary>
+    /// Fetches latest license information for packages using NuGet API to detect license changes.
+    /// </summary>
+    private async Task FetchLatestLicenseInformationAsync(IEnumerable<PackageInfo> packages)
+    {
+        // Limit concurrent operations to avoid overwhelming the NuGet service
+        const int maxConcurrency = 3;
+        var semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+        
+        var tasks = packages.Select(async package =>
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                await FetchLatestLicenseForPackageAsync(package);
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't fail the entire operation
+                Console.Error.WriteLine($"Warning: Could not fetch latest license for {package.Name}: {ex.Message}");
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+    }
+
+    /// <summary>
+    /// Fetches the latest license for a specific package using the NuGet V3 API.
+    /// </summary>
+    private async Task FetchLatestLicenseForPackageAsync(PackageInfo package)
+    {
+        // Skip if we don't have a latest version to check
+        if (string.IsNullOrEmpty(package.LatestVersion))
+            return;
+
+        try
+        {
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "CodeMedic/1.0");
+            httpClient.Timeout = TimeSpan.FromSeconds(15); // Slightly longer timeout for metadata
+            
+            // Use the NuGet V3 API to get package metadata for the latest version
+            var apiUrl = $"https://api.nuget.org/v3-flatcontainer/{package.Name.ToLowerInvariant()}/{package.LatestVersion.ToLowerInvariant()}/{package.Name.ToLowerInvariant()}.nuspec";
+            
+            var response = await httpClient.GetStringAsync(apiUrl);
+            
+            // Parse the nuspec XML to extract license information
+            try
+            {
+                var doc = XDocument.Parse(response);
+                var ns = doc.Root?.GetDefaultNamespace() ?? XNamespace.None;
+                
+                var metadata = doc.Root?.Element(ns + "metadata");
+                if (metadata != null)
+                {
+                    // Check for license element first (newer format)
+                    var licenseElement = metadata.Element(ns + "license");
+                    if (licenseElement != null)
+                    {
+                        var licenseType = licenseElement.Attribute("type")?.Value;
+                        if (licenseType == "expression")
+                        {
+                            package.LatestLicense = licenseElement.Value?.Trim();
+                        }
+                        else if (licenseType == "file")
+                        {
+                            package.LatestLicense = "See package contents";
+                        }
+                    }
+                    else
+                    {
+                        // Fall back to licenseUrl (older format)
+                        var licenseUrl = metadata.Element(ns + "licenseUrl")?.Value?.Trim();
+                        if (!string.IsNullOrWhiteSpace(licenseUrl))
+                        {
+                            package.LatestLicenseUrl = licenseUrl;
+                            // Extract license type from URL patterns (same logic as local license detection)
+                            if (licenseUrl.Contains("mit", StringComparison.OrdinalIgnoreCase))
+                            {
+                                package.LatestLicense = "MIT";
+                            }
+                            else if (licenseUrl.Contains("apache", StringComparison.OrdinalIgnoreCase))
+                            {
+                                package.LatestLicense = "Apache-2.0";
+                            }
+                            else if (licenseUrl.Contains("bsd", StringComparison.OrdinalIgnoreCase))
+                            {
+                                package.LatestLicense = "BSD";
+                            }
+                            else if (licenseUrl.Contains("gpl", StringComparison.OrdinalIgnoreCase))
+                            {
+                                package.LatestLicense = "GPL";
+                            }
+                            else
+                            {
+                                package.LatestLicense = "See URL";
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Warning: Could not parse latest nuspec for {package.Name}: {ex.Message}");
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            // Package might not exist on nuget.org or network issue
+            if (ex.Message.Contains("404"))
+            {
+                Console.Error.WriteLine($"Debug: Latest version nuspec for {package.Name} not found on nuget.org");
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Timeout - skip silently
+        }
+        catch (Exception ex)
+        {
+            // Log other unexpected errors but don't fail
+            Console.Error.WriteLine($"Warning: Could not fetch latest license for {package.Name}: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -759,12 +959,17 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         public required List<string> Projects { get; init; }
         public string? License { get; set; }
         public string? LicenseUrl { get; set; }
+        public string? LatestLicense { get; set; }
+        public string? LatestLicenseUrl { get; set; }
         public string SourceType { get; set; } = "Unknown";
         public string Commercial { get; set; } = "Unknown";
         public string? LatestVersion { get; set; }
         public bool HasNewerVersion => !string.IsNullOrEmpty(LatestVersion) && 
                                       !string.Equals(Version, LatestVersion, StringComparison.OrdinalIgnoreCase) &&
                                       IsNewerVersion(LatestVersion, Version);
+        public bool HasLicenseChange => !string.IsNullOrEmpty(License) && 
+                                       !string.IsNullOrEmpty(LatestLicense) && 
+                                       !NormalizeLicense(License).Equals(NormalizeLicense(LatestLicense), StringComparison.OrdinalIgnoreCase);
 
         private static bool IsNewerVersion(string? latestVersion, string currentVersion)
         {
@@ -803,6 +1008,34 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
                     return false;
             }
             return true;
+        }
+
+        private static string NormalizeLicense(string license)
+        {
+            if (string.IsNullOrEmpty(license)) return string.Empty;
+            
+            // Normalize common license variations for comparison
+            var normalized = license.Trim().ToLowerInvariant();
+            
+            // Handle common variations
+            var licenseMapping = new Dictionary<string, string>
+            {
+                { "mit", "mit" },
+                { "mit license", "mit" },
+                { "the mit license", "mit" },
+                { "apache-2.0", "apache-2.0" },
+                { "apache 2.0", "apache-2.0" },
+                { "apache license 2.0", "apache-2.0" },
+                { "bsd-3-clause", "bsd-3-clause" },
+                { "bsd 3-clause", "bsd-3-clause" },
+                { "bsd", "bsd" },
+                { "gpl-3.0", "gpl-3.0" },
+                { "gpl v3", "gpl-3.0" },
+                { "see url", "see url" },
+                { "see package contents", "see package contents" }
+            };
+            
+            return licenseMapping.TryGetValue(normalized, out var mappedLicense) ? mappedLicense : normalized;
         }
     }
 }
