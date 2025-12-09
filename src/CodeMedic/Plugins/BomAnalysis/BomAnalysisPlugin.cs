@@ -62,15 +62,13 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
                 Handler = ExecuteBomCommandAsync,
                 Arguments =
                 [
-                    new CommandArgument
-                    {
-                        ShortName = "p",
-                        LongName = "path",
-                        Description = "Path to the repository to analyze",
-                        HasValue = true,
-                        ValueName = "path",
-                        DefaultValue = "current directory"
-                    }
+                    new CommandArgument(
+                        Description: "Path to the repository to analyze",
+                        ShortName: "p",
+                        LongName: "path",
+                        HasValue: true,
+                        ValueName: "path",
+                        DefaultValue: "current directory")
                 ],
                 Examples =
                 [
