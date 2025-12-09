@@ -33,17 +33,21 @@ A detailed inventory of all NuGet dependencies across the solution.
 - Version  
 - Direct vs. transitive  
 - Target frameworks  
-- License type  
+- License type with link to the package license
 - Vendor/maintainer  
 - Repository URL  
 - Last update date  
 - Known vulnerabilities  
 - Advisory database links  
+- Open source vs. Closed Source
+- Commercial package with links to pricing pages
+
 
 ### Value  
 - Detect abandoned or risky packages  
 - Identify version inconsistencies across projects  
 - Provide upgrade recommendations  
+- Report changes in licenses between current used version and newer versions that are available
 
 ---
 
