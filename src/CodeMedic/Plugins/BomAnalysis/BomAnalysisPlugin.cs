@@ -60,10 +60,23 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
                 Name = "bom",
                 Description = "Generate bill of materials report",
                 Handler = ExecuteBomCommandAsync,
+                Arguments =
+                [
+                    new CommandArgument
+                    {
+                        ShortName = "p",
+                        LongName = "path",
+                        Description = "Path to the repository to analyze",
+                        HasValue = true,
+                        ValueName = "path",
+                        DefaultValue = "current directory"
+                    }
+                ],
                 Examples =
                 [
                     "codemedic bom",
-                    "codemedic bom --format markdown",
+                    "codemedic bom -p /path/to/repo",
+                    "codemedic bom --path /path/to/repo --format markdown",
                     "codemedic bom --format md > bom.md"
                 ]
             }

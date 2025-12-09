@@ -29,8 +29,8 @@ public class RootCommandHandler
         _pluginLoader = new PluginLoader();
         await _pluginLoader.LoadInternalPluginsAsync();
 
-        // No arguments or help requested
-        if (args.Length == 0 || args.Contains("--help") || args.Contains("-h") || args.Contains("help"))
+        // No arguments or general help requested
+        if (args.Length == 0 || args[0] == "--help" || args[0] == "-h" || args[0] == "help")
         {
             console.RenderBanner(version);
             RenderHelp();
@@ -51,6 +51,15 @@ public class RootCommandHandler
         
         if (commandRegistration != null)
         {
+            // Check for command-specific help
+            var commandArgs = args.Skip(1).ToArray();
+            if (commandArgs.Contains("--help") || commandArgs.Contains("-h"))
+            {
+                console.RenderBanner(version);
+                RenderCommandHelp(commandRegistration);
+                return 0;
+            }
+            
             // Parse --format argument (default: console)
             string format = "console";
             var commandArgsList = args.Skip(1).ToList();
@@ -114,9 +123,35 @@ public class RootCommandHandler
         AnsiConsole.MarkupLine("  [green]codemedic[/] [cyan]--version[/]");
         AnsiConsole.WriteLine();
 
-        AnsiConsole.MarkupLine("[dim]Options:[/]");
+        AnsiConsole.MarkupLine("[dim]Global Options:[/]");
         AnsiConsole.MarkupLine("  [yellow]--format <format>[/]  Output format: [cyan]console[/] (default), [cyan]markdown[/] (or [cyan]md[/])");
         AnsiConsole.WriteLine();
+
+        // Show command-specific arguments
+        if (_pluginLoader != null)
+        {
+            foreach (var command in _pluginLoader.Commands.Values.OrderBy(c => c.Name))
+            {
+                if (command.Arguments != null && command.Arguments.Length > 0)
+                {
+                    AnsiConsole.MarkupLine($"[dim]{command.Name} Command Options:[/]");
+                    
+                    foreach (var arg in command.Arguments)
+                    {
+                        var shortName = !string.IsNullOrEmpty(arg.ShortName) ? $"-{arg.ShortName}" : "";
+                        var longName = !string.IsNullOrEmpty(arg.LongName) ? $"--{arg.LongName}" : "";
+                        var names = string.Join(", ", new[] { shortName, longName }.Where(s => !string.IsNullOrEmpty(s)));
+                        
+                        var valuePart = arg.HasValue && !string.IsNullOrEmpty(arg.ValueName) ? $" <{arg.ValueName}>" : "";
+                        var requiredIndicator = arg.IsRequired ? " [red](required)[/]" : "";
+                        var defaultPart = !string.IsNullOrEmpty(arg.DefaultValue) ? $" (default: {arg.DefaultValue})" : "";
+                        
+                        AnsiConsole.MarkupLine($"  [yellow]{names}{valuePart}[/]  {arg.Description}{requiredIndicator}{defaultPart}");
+                    }
+                    AnsiConsole.WriteLine();
+                }
+            }
+        }
 
         AnsiConsole.MarkupLine("[dim]Examples:[/]");
         
@@ -136,6 +171,77 @@ public class RootCommandHandler
         }
 
         AnsiConsole.MarkupLine("  [green]codemedic --version[/]");
+    }
+
+    /// <summary>
+    /// Renders help text for a specific command.
+    /// </summary>
+    private static void RenderCommandHelp(CodeMedic.Abstractions.Plugins.CommandRegistration command)
+    {
+        AnsiConsole.MarkupLine($"[bold]Command: {command.Name}[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine($"{command.Description}");
+        AnsiConsole.WriteLine();
+
+        AnsiConsole.MarkupLine("[dim]Usage:[/]");
+        var usage = $"codemedic {command.Name}";
+        
+        if (command.Arguments != null && command.Arguments.Length > 0)
+        {
+            foreach (var arg in command.Arguments)
+            {
+                var argName = !string.IsNullOrEmpty(arg.LongName) ? $"--{arg.LongName}" : $"-{arg.ShortName}";
+                var valuePart = arg.HasValue && !string.IsNullOrEmpty(arg.ValueName) ? $" <{arg.ValueName}>" : "";
+                var optionalWrapper = arg.IsRequired ? "" : "[ ]";
+                
+                if (arg.IsRequired)
+                {
+                    usage += $" {argName}{valuePart}";
+                }
+                else
+                {
+                    usage += $" [{argName}{valuePart}]";
+                }
+            }
+        }
+        
+        usage += " [--format <format>]";
+        AnsiConsole.MarkupLine($"  [green]{usage.EscapeMarkup()}[/]");
+        AnsiConsole.WriteLine();
+
+        if (command.Arguments != null && command.Arguments.Length > 0)
+        {
+            AnsiConsole.MarkupLine("[dim]Command Options:[/]");
+            
+            foreach (var arg in command.Arguments)
+            {
+                var shortName = !string.IsNullOrEmpty(arg.ShortName) ? $"-{arg.ShortName}" : "";
+                var longName = !string.IsNullOrEmpty(arg.LongName) ? $"--{arg.LongName}" : "";
+                var names = string.Join(", ", new[] { shortName, longName }.Where(s => !string.IsNullOrEmpty(s)));
+                
+                var valuePart = arg.HasValue && !string.IsNullOrEmpty(arg.ValueName) ? $" <{arg.ValueName}>" : "";
+                var requiredIndicator = arg.IsRequired ? " [red](required)[/]" : "";
+                var defaultPart = !string.IsNullOrEmpty(arg.DefaultValue) ? $" (default: {arg.DefaultValue})" : "";
+                
+                AnsiConsole.MarkupLine($"  [yellow]{(names + valuePart).EscapeMarkup()}[/]  {arg.Description.EscapeMarkup()}{requiredIndicator}{defaultPart.EscapeMarkup()}");
+            }
+            AnsiConsole.WriteLine();
+        }
+
+        AnsiConsole.MarkupLine("[dim]Global Options:[/]");
+        AnsiConsole.MarkupLine("  [yellow]--format <format>[/]  Output format: [cyan]console[/] (default), [cyan]markdown[/] (or [cyan]md[/])");
+        AnsiConsole.MarkupLine("  [yellow]-h, --help[/]         Show this help message");
+        AnsiConsole.WriteLine();
+
+        if (command.Examples != null && command.Examples.Length > 0)
+        {
+            AnsiConsole.MarkupLine("[dim]Examples:[/]");
+            foreach (var example in command.Examples)
+            {
+                AnsiConsole.MarkupLine($"  [green]{example.EscapeMarkup()}[/]");
+            }
+            AnsiConsole.WriteLine();
+        }
     }
 
     /// <summary>

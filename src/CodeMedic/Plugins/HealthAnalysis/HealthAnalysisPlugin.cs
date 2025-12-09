@@ -56,10 +56,23 @@ public class HealthAnalysisPlugin : IAnalysisEnginePlugin
                 Name = "health",
                 Description = "Display repository health dashboard",
                 Handler = ExecuteHealthCommandAsync,
+                Arguments =
+                [
+                    new CommandArgument
+                    {
+                        ShortName = "p",
+                        LongName = "path",
+                        Description = "Path to the repository to analyze",
+                        HasValue = true,
+                        ValueName = "path",
+                        DefaultValue = "current directory"
+                    }
+                ],
                 Examples =
                 [
                     "codemedic health",
-                    "codemedic health --format markdown",
+                    "codemedic health -p /path/to/repo",
+                    "codemedic health --path /path/to/repo --format markdown",
                     "codemedic health --format md > report.md"
                 ]
             }
@@ -71,14 +84,7 @@ public class HealthAnalysisPlugin : IAnalysisEnginePlugin
         try
         {
             // Parse arguments (target path only)
-            string? targetPath = null;
-            for (int i = 0; i < args.Length; i++)
-            {
-                if (!args[i].StartsWith("--"))
-                {
-                    targetPath = args[i];
-                }
-            }
+            string? targetPath = args.IdentifyTargetPathFromArgs();
 
             _limitPackageLists = renderer is ConsoleRenderer;
 
