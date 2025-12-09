@@ -16,9 +16,10 @@ public static class CommandLineArgumentExtensions
 		string? targetPath = null;
 		for (int i = 0; i < args.Length; i++)
 		{
-			if (args[i].StartsWith("-p") || args[i].StartsWith("--path"))
+			if ((args[i].StartsWith("-p") || args[i].StartsWith("--path")) && i + 1 < args.Length)
 			{
 				targetPath = args[i + 1];
+				break; // Return the first found path argument
 			}
 		}
 
