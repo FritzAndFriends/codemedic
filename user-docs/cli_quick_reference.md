@@ -26,20 +26,42 @@ codemedic -v
 
 # Repository health analysis
 codemedic health
-codemedic health --format markdown > report.md
+codemedic health -p /path/to/repo
+codemedic health --path /path/to/repo --format markdown > report.md
 
 # Bill of materials
 codemedic bom
-codemedic bom --format json
-codemedic bom --format markdown
+codemedic bom -p /path/to/repo
+codemedic bom --path /path/to/repo --format markdown
 
 # Vulnerability scanning
 codemedic vulnerabilities
-codemedic vulnerabilities --format markdown > vulnerabilities-report.md
-codemedic vulnerabilities /path/to/repo
+codemedic vulnerabilities -p /path/to/repo
+codemedic vulnerabilities --path /path/to/repo --format markdown > vulnerabilities-report.md
 ```
 
-## Output Formats
+## Command Options
+
+### Path Argument
+All analysis commands support a path argument to specify which repository to analyze:
+
+- `-p <path>` or `--path <path>` - Specify the path to the repository
+- If not provided, uses the current directory
+
+```bash
+# Analyze current directory
+codemedic health
+
+# Analyze specific directory
+codemedic health -p /path/to/repo
+codemedic health --path /path/to/repo
+
+# Relative paths work too
+codemedic bom -p ../other-project
+codemedic vulnerabilities --path .
+```
+
+### Output Formats
 
 All commands support `--format` option:
 - `console` (default) - Rich formatted output for terminal

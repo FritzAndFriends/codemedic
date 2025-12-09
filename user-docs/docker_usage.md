@@ -38,18 +38,27 @@ docker run --rm codemedic:latest --help
 **Run health check on current directory:**
 ```bash
 # Windows (PowerShell)
-docker run --rm -v ${PWD}:/repo codemedic:latest health /repo
+docker run --rm -v ${PWD}:/repo codemedic:latest health --path /repo
 
 # Windows (Command Prompt)
-docker run --rm -v %cd%:/repo codemedic:latest health /repo
+docker run --rm -v %cd%:/repo codemedic:latest health --path /repo
 
 # Linux/macOS
-docker run --rm -v $(pwd):/repo codemedic:latest health /repo
+docker run --rm -v $(pwd):/repo codemedic:latest health --path /repo
 ```
 
 **Run health check with output to file:**
 ```bash
-docker run --rm -v ${PWD}:/repo codemedic:latest health /repo --output /repo/health-report.md
+docker run --rm -v ${PWD}:/repo codemedic:latest health -p /repo --format markdown > health-report.md
+```
+
+**Run other commands:**
+```bash
+# Bill of Materials
+docker run --rm -v $(pwd):/repo codemedic:latest bom --path /repo
+
+# Vulnerability scan
+docker run --rm -v $(pwd):/repo codemedic:latest vulnerabilities -p /repo --format markdown
 ```
 
 ## Build Script Options

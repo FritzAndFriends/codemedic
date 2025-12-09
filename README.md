@@ -50,6 +50,8 @@ dotnet run -- --help
 - ✅ Bill of Materials (BOM) generation
 - ✅ NuGet package vulnerability scanning
 - ✅ Multiple output formats (console, markdown)
+- ✅ Path argument support (`-p` / `--path`) for all analysis commands
+- ✅ Command-specific help with argument documentation
 
 ## 🎯 Current Commands
 
@@ -61,13 +63,13 @@ codemedic --version      # Show version
 
 # Analysis commands
 codemedic health         # Repository health dashboard
-codemedic health --format markdown
+codemedic health -p /path/to/repo --format markdown
 
 codemedic bom            # Bill of Materials
-codemedic bom --format md > bom.md
+codemedic bom --path /path/to/repo --format md > bom.md
 
 codemedic vulnerabilities        # Scan for NuGet vulnerabilities
-codemedic vulnerabilities --format markdown > vulns.md
+codemedic vulnerabilities -p /path/to/repo --format markdown > vulns.md
 ```
 
 ## 🔧 Technology Stack

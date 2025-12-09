@@ -231,6 +231,123 @@ public class PluginMetadata
 
 ---
 
+## Command Registration System
+
+Analysis engine plugins can register CLI commands with arguments using the `RegisterCommands()` method. This enables plugins to expose their functionality through dedicated CLI commands with proper argument parsing and help integration.
+
+### CommandRegistration & CommandArgument
+
+```csharp
+namespace CodeMedic.Abstractions.Plugins;
+
+/// <summary>
+/// Represents a command that can be registered with the CLI.
+/// </summary>
+public class CommandRegistration
+{
+    public required string Name { get; init; }                    // Command name (e.g., "health")
+    public required string Description { get; init; }             // Command description for help
+    public required Func<string[], IRenderer, Task<int>> Handler { get; init; }  // Command handler
+    public string[]? Examples { get; init; }                      // Usage examples
+    public CommandArgument[]? Arguments { get; init; }            // Command arguments
+}
+
+/// <summary>
+/// Represents a command-line argument specification.
+/// </summary>
+public record CommandArgument(
+    string Description,                   // Required: what this argument does
+    string? ShortName = null,            // Short form: "p" for "-p"
+    string? LongName = null,             // Long form: "path" for "--path"
+    bool IsRequired = false,             // Whether argument is mandatory
+    bool HasValue = true,                // Whether argument takes a value
+    string? DefaultValue = null,         // Default value description
+    string? ValueName = null);           // Value type for help display
+```
+
+### Command Registration Features
+
+- **Automatic Help Integration**: Commands with arguments automatically appear in `--help` output
+- **Command-Specific Help**: `codemedic mycommand --help` shows detailed argument information
+- **Argument Parsing**: Use built-in utilities like `IdentifyTargetPathFromArgs()` for common patterns
+- **Rich Help Display**: Arguments show descriptions, default values, and usage examples
+
+### Built-in Path Argument Support
+
+All current analysis plugins support the standard path argument pattern:
+
+```bash
+# Current directory (default)
+codemedic health
+
+# Specific path (short form)
+codemedic health -p /path/to/repo
+
+# Specific path (long form)  
+codemedic health --path /path/to/repo
+
+# Combined with format
+codemedic bom -p ../other-project --format markdown
+```
+
+### Example: Plugin with Command Registration
+
+```csharp
+public class MyAnalysisPlugin : IAnalysisEnginePlugin
+{
+    // ... other plugin implementation ...
+
+    public CommandRegistration[]? RegisterCommands()
+    {
+        return
+        [
+            new CommandRegistration
+            {
+                Name = "myanalysis",
+                Description = "Run my custom analysis",
+                Handler = ExecuteMyAnalysisAsync,
+                Arguments =
+                [
+                    new CommandArgument(
+                        Description: "Path to the repository to analyze",
+                        ShortName: "p",
+                        LongName: "path",
+                        ValueName: "path",
+                        DefaultValue: "current directory"),
+                    new CommandArgument(
+                        Description: "Enable verbose output",
+                        ShortName: "v",
+                        LongName: "verbose",
+                        HasValue: false)  // Flag argument
+                ],
+                Examples =
+                [
+                    "codemedic myanalysis",
+                    "codemedic myanalysis -p /path/to/repo",
+                    "codemedic myanalysis --path /path/to/repo --verbose",
+                    "codemedic myanalysis -p . -v --format markdown"
+                ]
+            }
+        ];
+    }
+
+    private async Task<int> ExecuteMyAnalysisAsync(string[] args, IRenderer renderer)
+    {
+        // Parse path argument using built-in extension
+        var targetPath = args.IdentifyTargetPathFromArgs();
+        
+        // Run analysis on the specified path
+        var result = await AnalyzeAsync(targetPath);
+        
+        // Render results
+        renderer.RenderReport(result);
+        return 0;
+    }
+}
+```
+
+---
+
 ## Plugin Development Workflow
 
 ### Step 1: Create the Plugin Project
