@@ -1,5 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using CodeMedic.Abstractions.Plugins;
+using CodeMedic.Plugins.BomAnalysis;
+using CodeMedic.Plugins.HealthAnalysis;
+using CodeMedic.Plugins.VulnerabilityAnalysis;
 
 namespace CodeMedic.Utilities;
 
@@ -33,8 +37,19 @@ public class PluginLoader
     /// <param name="cancellationToken">Cancellation token for async operations.</param>
     public async Task LoadInternalPluginsAsync(CancellationToken cancellationToken = default)
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        await LoadPluginsFromAssemblyAsync(assembly, cancellationToken);
+        // NativeAOT + trimming are not compatible with reflection-based plugin discovery.
+        // Internal plugins are known at compile-time, so register them explicitly.
+        var plugins = new IPlugin[]
+        {
+            new BomAnalysisPlugin(),
+            new HealthAnalysisPlugin(),
+            new VulnerabilityAnalysisPlugin()
+        };
+
+        foreach (var plugin in plugins)
+        {
+            await LoadPluginInstanceAsync(plugin, cancellationToken);
+        }
     }
 
     /// <summary>
@@ -42,6 +57,8 @@ public class PluginLoader
     /// </summary>
     /// <param name="assembly">The assembly to scan for plugins.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    [UnconditionalSuppressMessage("Trimming", "IL2026:Assembly.GetTypes", Justification = "Optional reflection-based plugin discovery is not used for NativeAOT publishing.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2072:Activator.CreateInstance", Justification = "Optional reflection-based plugin discovery is not used for NativeAOT publishing.")]
     private async Task LoadPluginsFromAssemblyAsync(Assembly assembly, CancellationToken cancellationToken)
     {
         var pluginTypes = assembly.GetTypes()
@@ -51,41 +68,40 @@ public class PluginLoader
         {
             try
             {
-                // Create instance of the plugin
                 var plugin = Activator.CreateInstance(pluginType) as IPlugin;
-                if (plugin == null)
+                if (plugin != null)
                 {
-                    continue;
-                }
-
-                // Initialize the plugin
-                await plugin.InitializeAsync(cancellationToken);
-
-                // Register the plugin based on its type
-                if (plugin is IAnalysisEnginePlugin analysisEngine)
-                {
-                    _analysisEngines.Add(analysisEngine);
-
-                    // Register commands if the plugin provides them
-                    var commands = analysisEngine.RegisterCommands();
-                    if (commands != null)
-                    {
-                        foreach (var command in commands)
-                        {
-                            _commandRegistrations[command.Name] = command;
-                        }
-                    }
-                }
-
-                if (plugin is IReporterPlugin reporter)
-                {
-                    _reporters.Add(reporter);
+                    await LoadPluginInstanceAsync(plugin, cancellationToken);
                 }
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Failed to load plugin {pluginType.Name}: {ex.Message}");
             }
+        }
+    }
+
+    private async Task LoadPluginInstanceAsync(IPlugin plugin, CancellationToken cancellationToken)
+    {
+        await plugin.InitializeAsync(cancellationToken);
+
+        if (plugin is IAnalysisEnginePlugin analysisEngine)
+        {
+            _analysisEngines.Add(analysisEngine);
+
+            var commands = analysisEngine.RegisterCommands();
+            if (commands != null)
+            {
+                foreach (var command in commands)
+                {
+                    _commandRegistrations[command.Name] = command;
+                }
+            }
+        }
+
+        if (plugin is IReporterPlugin reporter)
+        {
+            _reporters.Add(reporter);
         }
     }
 

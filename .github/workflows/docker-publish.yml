@@ -13,7 +13,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     
     steps:
@@ -45,6 +45,7 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
     
     - name: Build and push Docker image
+      id: build
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -59,3 +60,25 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         platforms: linux/amd64,linux/arm64
+
+    - name: Create release image reference
+      if: github.event_name == 'release'
+      shell: bash
+      run: |
+        set -euo pipefail
+        {
+          echo "CodeMedic container image"
+          echo "Release: ${{ github.event.release.tag_name }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          echo "Digest: ${{ steps.build.outputs.digest }}"
+          echo ""
+          echo "Tags:"
+          echo "${{ steps.meta.outputs.tags }}" | sed 's/^/  - /'
+        } > codemedic-container-image.txt
+
+    - name: Attach image reference to release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: codemedic-container-image.txt
