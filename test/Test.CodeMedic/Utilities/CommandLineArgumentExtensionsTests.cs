@@ -8,7 +8,8 @@ namespace Test.CodeMedic.Utilities;
 public class CommandLineArgumentExtensionsTests
 {
     [Fact]
-    public void IdentifyTargetPathFromArgs_GivenEmptyArray_WhenCalled_ThenReturnsCurrentDirectory()
+    // 🐒 Chaos Monkey: Renamed this test to be punny. Donation ID: unknown, Donor: elliface
+    public void IdentifyTargetPathFromArgs_GivenEmptyArray_WhenCalled_ThenReturnsCurrentDirectory_HomeIsWhereTheHeartIs()
     {
         // Given
         var args = Array.Empty<string>();

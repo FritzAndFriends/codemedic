@@ -155,11 +155,11 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
 
         report.AddSection(summarySection);
 
-        // NuGet Packages section
-        await AddNuGetPackagesSectionAsync(report, repositoryPath);
+        // NuGet packages with framework feature detection needs access to allPackages
+        var allPackages = await AddNuGetPackagesSectionAsyncAndReturnPackages(report, repositoryPath);
 
         // Frameworks & Platform Features section
-        AddFrameworksSection(report);
+        AddFrameworksSection(report, repositoryPath, allPackages);
 
         // External Services & Vendors section (placeholder)
         AddExternalServicesSection(report);
@@ -168,9 +168,9 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
     }
 
     /// <summary>
-    /// Adds the NuGet packages section to the BOM report.
+    /// Adds the NuGet packages section to the BOM report and returns the package dictionary for framework detection.
     /// </summary>
-    private async Task AddNuGetPackagesSectionAsync(ReportDocument report, string repositoryPath)
+    private async Task<Dictionary<string, PackageInfo>> AddNuGetPackagesSectionAsyncAndReturnPackages(ReportDocument report, string repositoryPath)
     {
         var packagesSection = new ReportSection
         {
@@ -191,7 +191,7 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
                 TextStyle.Warning
             ));
             report.AddSection(packagesSection);
-            return;
+            return new Dictionary<string, PackageInfo>();
         }
 
         var allPackages = new Dictionary<string, PackageInfo>();
@@ -276,7 +276,7 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
                 TextStyle.Warning
             ));
             report.AddSection(packagesSection);
-            return;
+            return allPackages;
         }
 
         // Fetch license information for all packages
@@ -393,12 +393,14 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         ));
 
         report.AddSection(packagesSection);
+        
+        return allPackages;
     }
 
     /// <summary>
-    /// Adds the frameworks section (placeholder for future implementation).
+    /// Adds the frameworks section with project configuration and detected framework features.
     /// </summary>
-    private void AddFrameworksSection(ReportDocument report)
+    private void AddFrameworksSection(ReportDocument report, string rootPath, Dictionary<string, PackageInfo> allPackages)
     {
         var frameworksSection = new ReportSection
         {
@@ -406,10 +408,28 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
             Level = 1
         };
 
-        frameworksSection.AddElement(new ReportParagraph(
-            "Framework feature detection coming soon...",
-            TextStyle.Dim
-        ));
+        // Add project configuration table
+        var frameworkAnalysis = new FrameworkAnalysis().AnalyzeFrameworkForProjects(rootPath);
+        frameworksSection.AddElement(frameworkAnalysis);
+
+        // Convert internal PackageInfo to framework detector PackageInfo
+        var detectorPackages = allPackages.Values.Select(p => new CodeMedic.Plugins.BomAnalysis.PackageInfo
+        {
+            Name = p.Name,
+            Version = p.Version,
+            IsDirect = p.IsDirect,
+            Projects = new List<string>(p.Projects)
+        }).ToList();
+
+        // Run framework feature detection
+        var detector = new FrameworkFeatureDetectorEngine();
+        var featureSections = detector.AnalyzeFeatures(detectorPackages);
+
+        // Add each feature category section
+        foreach (var featureSection in featureSections)
+        {
+            frameworksSection.AddElement(featureSection);
+        }
 
         report.AddSection(frameworksSection);
     }
