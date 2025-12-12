@@ -1,0 +1,123 @@
+name: Release Binaries (NativeAOT)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+
+jobs:
+  publish-aot:
+    name: Publish NativeAOT (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            ext: .exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            ext: ""
+          - os: ubuntu-latest
+            rid: linux-arm64
+            ext: ""
+            needsCross: true
+          - os: macos-13
+            rid: osx-x64
+            ext: ""
+          - os: macos-latest
+            rid: osx-arm64
+            ext: ""
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install NativeAOT prerequisites (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev
+
+      - name: Install cross toolchain (linux-arm64)
+        if: runner.os == 'Linux' && matrix.needsCross
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+      - name: Restore
+        run: dotnet restore src/CodeMedic.sln
+
+      - name: Publish (NativeAOT)
+        run: >-
+          dotnet publish src/CodeMedic/CodeMedic.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          /p:PublishAot=true
+
+      - name: Prepare artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.event.release.tag_name }}"
+          if [ -z "$VERSION" ]; then VERSION="manual"; fi
+
+          OUTDIR="src/CodeMedic/bin/Release/net10.0/${{ matrix.rid }}/publish"
+          BIN="$OUTDIR/CodeMedic${{ matrix.ext }}"
+
+          if [ ! -f "$BIN" ]; then
+            echo "Expected binary not found at $BIN"
+            echo "Publish directory contents:"
+            ls -la "$OUTDIR" || true
+            exit 1
+          fi
+
+          mkdir -p artifacts
+          DEST="artifacts/CodeMedic-${VERSION}-${{ matrix.rid }}${{ matrix.ext }}"
+          cp "$BIN" "$DEST"
+
+      - name: Generate checksums (SHA-256)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $files = Get-ChildItem -LiteralPath 'artifacts' -File | Where-Object { $_.Name -notmatch '\.sha256$' }
+          if (-not $files -or $files.Count -eq 0) {
+            throw 'No artifacts found to checksum.'
+          }
+
+          foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file.FullName).Hash.ToLowerInvariant()
+            $line = "$hash  $($file.Name)"
+            $checksumPath = "$($file.FullName).sha256"
+            $line | Out-File -FilePath $checksumPath -Encoding ascii
+          }
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodeMedic-${{ matrix.rid }}
+          path: artifacts/*
+
+      - name: Attach binaries to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*

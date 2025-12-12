@@ -171,7 +171,7 @@ public class RepositoryScanner
             {
                 var versionDetails = string.Join(", ", mismatch.ProjectVersions
                     .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-                    .Select(kv => $"{kv.Key}={kv.Value}"));
+                    .Select(kv => $"{kv.Key}={string.Join("|", kv.Value.OrderBy(v => v, StringComparer.OrdinalIgnoreCase))}"));
 
                 mismatchList.AddItem($"{mismatch.PackageName}: {versionDetails}");
             }
@@ -651,45 +651,58 @@ public class RepositoryScanner
     }
 
     private List<PackageVersionMismatch> FindPackageVersionMismatches()
+        => ComputePackageVersionMismatches(_projects);
+
+    internal static List<PackageVersionMismatch> ComputePackageVersionMismatches(IEnumerable<ProjectInfo> projects)
     {
-        var packageVersions = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var project in _projects)
-        {
-            foreach (var package in project.PackageDependencies)
+        var all = projects
+            .SelectMany(project =>
             {
-                if (string.IsNullOrWhiteSpace(package.Name) || package.Name.Equals("unknown", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
+                var projectName = string.IsNullOrWhiteSpace(project.ProjectName) ? "unknown" : project.ProjectName;
 
-                if (string.IsNullOrWhiteSpace(package.Version) || package.Version.Equals("unknown", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
+                var direct = project.PackageDependencies
+                    .Select(p => (Name: p.Name, Version: p.Version, Project: projectName));
 
-                if (!packageVersions.TryGetValue(package.Name, out var versionsByProject))
-                {
-                    versionsByProject = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    packageVersions[package.Name] = versionsByProject;
-                }
+                var transitive = project.TransitiveDependencies
+                    .Select(t => (Name: t.PackageName, Version: t.Version, Project: projectName));
 
-                versionsByProject[project.ProjectName] = package.Version;
-            }
-        }
+                return direct.Concat(transitive);
+            })
+            .Where(x =>
+                !string.IsNullOrWhiteSpace(x.Name) &&
+                !x.Name.Equals("unknown", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(x.Version) &&
+                !x.Version.Equals("unknown", StringComparison.OrdinalIgnoreCase));
 
-        var mismatches = new List<PackageVersionMismatch>();
-
-        foreach (var kvp in packageVersions)
-        {
-            var distinctVersions = kvp.Value.Values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (distinctVersions.Count > 1)
+        return all
+            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
             {
-                mismatches.Add(new PackageVersionMismatch(kvp.Key, kvp.Value));
-            }
-        }
+                var versionsByProject = group
+                    .GroupBy(x => x.Project, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => (IReadOnlyCollection<string>)g
+                            .Select(x => x.Version)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList(),
+                        StringComparer.OrdinalIgnoreCase);
 
-        return mismatches;
+                var distinctVersions = versionsByProject.Values
+                    .SelectMany(v => v)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return new
+                {
+                    PackageName = group.Key,
+                    VersionsByProject = versionsByProject,
+                    DistinctVersionCount = distinctVersions.Count
+                };
+            })
+            .Where(x => x.DistinctVersionCount > 1)
+            .Select(x => new PackageVersionMismatch(x.PackageName, x.VersionsByProject))
+            .ToList();
     }
 
     /// <summary>
@@ -732,7 +745,7 @@ public class RepositoryScanner
         }
     }
 
-    private sealed record PackageVersionMismatch(string PackageName, Dictionary<string, string> ProjectVersions);
+    internal sealed record PackageVersionMismatch(string PackageName, Dictionary<string, IReadOnlyCollection<string>> ProjectVersions);
 
     /// <summary>
     /// Counts total lines of code in all C# files included in a project, excluding blank lines and comments.

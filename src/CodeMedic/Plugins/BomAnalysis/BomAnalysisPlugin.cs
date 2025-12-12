@@ -309,8 +309,8 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
                 latestVersionDisplay = "Current";
             }
 
-            // Truncate package names if too long to improve table formatting
-            var displayName = package.Name.Length > 25 ? package.Name.Substring(0, 22) + "..." : package.Name;
+            // Keep full package names/licenses for report accuracy.
+            var displayName = package.Name;
             
             // Shorten source type and commercial status for better formatting
             var sourceType = package.SourceType == "Open Source" ? "Open" : 
@@ -320,8 +320,7 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
             var commercial = package.Commercial == "Unknown" ? "?" : 
                            package.Commercial == "Yes" ? "Y" : "N";
             
-            // Truncate license if too long
-            var license = package.License?.Length > 12 ? package.License.Substring(0, 9) + "..." : package.License ?? "Unknown";
+            var license = package.License ?? "Unknown";
 
             packagesTable.AddRow(
                 displayName,
@@ -527,19 +526,36 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
             var apiUrl = $"https://api.nuget.org/v3-flatcontainer/{package.Name.ToLowerInvariant()}/index.json";
             
             var response = await httpClient.GetStringAsync(apiUrl);
-            var versionData = JsonSerializer.Deserialize<NuGetVersionResponse>(response, new JsonSerializerOptions
+
+            using var doc = JsonDocument.Parse(response);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
             {
-                PropertyNameCaseInsensitive = true
-            });
-            
-            if (versionData?.Versions?.Length > 0)
+                return;
+            }
+
+            if (!doc.RootElement.TryGetProperty("versions", out var versionsElement) ||
+                versionsElement.ValueKind != JsonValueKind.Array)
             {
-                // Get the latest stable version (not pre-release)
-                var latestVersion = versionData.Versions
-                    .Where(v => !IsPreReleaseVersion(v))
-                    .LastOrDefault() ?? versionData.Versions.Last();
-                    
-                package.LatestVersion = latestVersion;
+                return;
+            }
+
+            var versions = new List<string>();
+            foreach (var element in versionsElement.EnumerateArray())
+            {
+                if (element.ValueKind == JsonValueKind.String)
+                {
+                    var value = element.GetString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        versions.Add(value);
+                    }
+                }
+            }
+
+            if (versions.Count > 0)
+            {
+                var latestStable = versions.Where(v => !IsPreReleaseVersion(v)).LastOrDefault();
+                package.LatestVersion = latestStable ?? versions.Last();
             }
         }
         catch (HttpRequestException ex)

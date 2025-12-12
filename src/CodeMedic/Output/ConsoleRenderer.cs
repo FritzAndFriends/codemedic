@@ -234,7 +234,8 @@ public class ConsoleRenderer : IRenderer
     {
         var table = new Table
         {
-            Border = TableBorder.Rounded
+            Border = TableBorder.Rounded,
+            Expand = true
         };
 
         if (!string.IsNullOrWhiteSpace(reportTable.Title))
@@ -242,10 +243,30 @@ public class ConsoleRenderer : IRenderer
             table.Title = new TableTitle($"[bold]{reportTable.Title}[/]");
         }
 
-        // Add columns
+        // Add columns (wrap long-text columns; keep short columns compact)
+        var noWrapHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Version",
+            "Latest",
+            "Type",
+            "License",
+            "Source",
+            "Comm",
+            "Severity",
+            "Score",
+            "Count",
+            "Status"
+        };
+
         foreach (var header in reportTable.Headers)
         {
-            table.AddColumn(header);
+            var column = new TableColumn(header);
+            if (noWrapHeaders.Contains(header))
+            {
+                column.NoWrap();
+            }
+
+            table.AddColumn(column);
         }
 
         // Add rows
