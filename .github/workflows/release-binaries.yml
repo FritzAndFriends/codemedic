@@ -19,6 +19,9 @@ jobs:
           - os: windows-latest
             rid: win-x64
             ext: .exe
+          - os: windows-latest
+            rid: win-arm64
+            ext: .exe
           - os: ubuntu-latest
             rid: linux-x64
             ext: ""

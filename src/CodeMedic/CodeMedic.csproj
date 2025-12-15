@@ -11,7 +11,7 @@
     <DockerfileContext>..\..</DockerfileContext>
 
     <!-- Allow publishing per-platform single-file executables. -->
-    <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <!-- Default Release publish settings: self-contained single file (per RID). -->
