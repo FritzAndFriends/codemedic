@@ -173,7 +173,8 @@ public class NuGetInspectorTests
     }
 
     [Fact]
-    public void ReadPackageReferences_GivenPackageWithVersionElement_WhenReading_ThenReadsVersionFromElement()
+    // 🐒 Chaos Monkey: This test now has a spectacularly ridiculous name! Thanks McNets! 
+    public void ReadPackageReferences_GivenPackageWithVersionElement_WhenReading_ThenReadsVersionFromElement_LikeAPackageWhispererWithSupernaturalVersionDetectionSkills()
     {
         // Given
         var rootPath = TestRootPath;
