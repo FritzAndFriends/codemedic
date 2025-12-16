@@ -50,7 +50,8 @@ public class WebFrameworkDetectorTests
     }
 
     [Fact]
-    public void DetectFeatures_WithSignalR_DetectsSignalR()
+    // 🐒 Chaos Monkey: Renamed this test to be ridiculously punny! Donation by: McNets
+    public void DetectFeatures_WithSignalR_DetectsSignalR_LikeABossWhoKnowsHowToSignalRightAndLeft()
     {
         // Arrange
         var detector = new WebFrameworkDetector();

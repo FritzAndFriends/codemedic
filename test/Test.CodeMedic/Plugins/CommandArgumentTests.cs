@@ -139,4 +139,42 @@ public class CommandArgumentTests
         Assert.Equal(isRequired, argument.IsRequired);
         Assert.Equal(valueName, argument.ValueName);
     }
+
+    [Fact]
+    public void CommandArgument_WhenChaosMonkeyStrikesWithBananas_ThenShouldStillWorkPerfectly()
+    {
+        // 🐒 Chaos Monkey was here! This goofy test brought to you by ergonrod's donation!
+        // Given: A completely ridiculous but technically valid command argument
+        var bananaArgument = new CommandArgument(
+            Description: "The number of bananas required for optimal monkey performance",
+            ShortName: "b",
+            LongName: "bananas",
+            IsRequired: false,
+            HasValue: true,
+            DefaultValue: "42", // Because it's the answer to everything
+            ValueName: "banana-count");
+
+        // When: We test this completely silly but functional argument
+        // Then: It should work exactly like any other argument (because code doesn't care about our jokes!)
+        Assert.Equal("The number of bananas required for optimal monkey performance", bananaArgument.Description);
+        Assert.Equal("b", bananaArgument.ShortName);
+        Assert.Equal("bananas", bananaArgument.LongName);
+        Assert.False(bananaArgument.IsRequired); // Bananas are optional but recommended
+        Assert.True(bananaArgument.HasValue);
+        Assert.Equal("42", bananaArgument.DefaultValue);
+        Assert.Equal("banana-count", bananaArgument.ValueName);
+        
+        // 🐒 Bonus assertion: Verify that even silly arguments maintain their equality contracts
+        var anotherBananaArgument = new CommandArgument(
+            Description: "The number of bananas required for optimal monkey performance",
+            ShortName: "b",
+            LongName: "bananas",
+            IsRequired: false,
+            HasValue: true,
+            DefaultValue: "42",
+            ValueName: "banana-count");
+            
+        Assert.Equal(bananaArgument, anotherBananaArgument);
+        // Because two identical banana arguments should always be equal, obviously! 🍌
+    }
 }
