@@ -10,7 +10,7 @@ namespace CodeMedic.Commands;
 /// </summary>
 public class RootCommandHandler
 {
-	private static PluginLoader? _pluginLoader;
+	private static PluginLoader _pluginLoader = null!;
 
 	/// <summary>
 	/// Gets a console renderer for providing feedback to the user.
@@ -23,7 +23,6 @@ public class RootCommandHandler
 	public static async Task<int> ProcessArguments(string[] args)
 	{
 		var version = VersionUtility.GetVersion();
-		var console = new ConsoleRenderer();
 
 		// Load plugins first
 		_pluginLoader = new PluginLoader();
@@ -32,12 +31,12 @@ public class RootCommandHandler
 		// No arguments or general help requested
 		if (args.Length == 0 || args[0] == "--help" || args[0] == "-h" || args[0] == "help")
 		{
-			console.RenderBanner(version);
+			Console.RenderBanner(version);
 			RenderHelp();
 			return 0;
 		}
 
-		var (flowControl, value) = await HandleConfigCommand(args, version, console);
+		var (flowControl, value) = await HandleConfigCommand(args, version);
 		if (!flowControl)
 		{
 			return value;
@@ -61,13 +60,14 @@ public class RootCommandHandler
 			var commandArgs = args.Skip(1).ToArray();
 			if (commandArgs.Contains("--help") || commandArgs.Contains("-h"))
 			{
-				console.RenderBanner(version);
+				Console.RenderBanner(version);
 				RenderCommandHelp(commandRegistration);
 				return 0;
 			}
 
 			// Parse --format argument (default: console)
 			string format = "console";
+			string outputDir = string.Empty;
 			var commandArgsList = args.Skip(1).ToList();
 			for (int i = 0; i < commandArgsList.Count; i++)
 			{
@@ -78,7 +78,18 @@ public class RootCommandHandler
 					commandArgsList.RemoveAt(i);
 					break;
 				}
+
+				// if ((commandArgsList[i] == "--output-dir" || commandArgsList[i] == "-o") && i + 1 < commandArgsList.Count)
+				// {
+				// 	outputDir = commandArgsList[i + 1];
+				// 	commandArgsList.RemoveAt(i + 1);
+				// 	commandArgsList.RemoveAt(i);
+				// 	break;
+				// }
+
 			}
+
+
 			IRenderer renderer = format switch
 			{
 				"markdown" or "md" => new MarkdownRenderer(),
@@ -88,12 +99,12 @@ public class RootCommandHandler
 		}
 
 		// Unknown command
-		console.RenderError($"Unknown command: {args[0]}");
+		Console.RenderError($"Unknown command: {args[0]}");
 		RenderHelp();
 		return 1;
 	}
 
-	private static async Task<(bool flowControl, int value)> HandleConfigCommand(string[] args, string version, ConsoleRenderer console)
+	private static async Task<(bool flowControl, int value)> HandleConfigCommand(string[] args, string version)
 	{
 
 		if (args.Length < 2 || (args[0] != "config"))
@@ -101,19 +112,19 @@ public class RootCommandHandler
 			return (flowControl: true, value: default);
 		}
 
-		console.RenderBanner(version);
+		Console.RenderBanner(version);
 
 		// Load a configuration file specified in the following argument and begin processing the instructions in that file.
 		if (args.Length < 2)
 		{
-			console.RenderError("No configuration file specified. Please provide a path to a configuration file.");
+			Console.RenderError("No configuration file specified. Please provide a path to a configuration file.");
 			return (flowControl: false, value: 1);
 		}
 
 		var configFilePath = args[1];
 		if (!File.Exists(configFilePath))
 		{
-			console.RenderError($"Configuration file not found: {configFilePath}");
+			Console.RenderError($"Configuration file not found: {configFilePath}");
 			return (flowControl: false, value: 1);
 		}
 

@@ -1,5 +1,6 @@
 using CodeMedic.Utilities;
 using CodeMedic.Commands;
+using CodeMedic.Output;
 
 namespace CodeMedic.Commands;
 
@@ -35,8 +36,9 @@ public class ConfigurationCommandHandler
 		}
 
 		// Load the specified configuration file - we need to identify the file type and load accordingly
+		CodeMedicRunConfiguration config;
 		try {
-		var config = LoadConfigurationFromFile(configFilePath);
+		config = LoadConfigurationFromFile(configFilePath);
 		if (config == null)
 		{
 			RootCommandHandler.Console.RenderError($"Failed to load configuration from file: {configFilePath}");
@@ -48,8 +50,53 @@ public class ConfigurationCommandHandler
 			return 1; // Return a non-zero exit code to indicate failure
 		}
 
-		// TODO: Use the loaded configuration to perform further actions
+		await RunCommandsForConfigurationAsync(config);
+
 		return 0; // Return zero to indicate success
+
+	}
+
+	private async Task RunCommandsForConfigurationAsync(CodeMedicRunConfiguration config)
+	{
+
+		// For each repository in the configuration, run the specified commands
+		foreach (var repoConfig in config.Repositories)
+		{
+			RootCommandHandler.Console.RenderInfo($"Processing repository: {repoConfig.Name} at {repoConfig.Path}");
+
+			foreach (var commandName in repoConfig.Commands)
+			{
+
+				// Check that the command is registered with the plugin loader
+				if (!_PluginLoader.Commands.ContainsKey(commandName))
+				{
+					RootCommandHandler.Console.RenderError($"  Command not registered: {commandName}");
+					continue;
+				}
+
+				RootCommandHandler.Console.RenderInfo($"  Running command: {commandName}");
+
+				// Load the command plugin
+				var commandPlugin = _PluginLoader.GetCommand(commandName);
+				if (commandPlugin == null)
+				{
+					RootCommandHandler.Console.RenderError($"    Command plugin not found: {commandName}");
+					continue;
+				}
+
+				// Get the Formatter plugin for output formatting - we only support markdown for now
+				var reportPath = Path.Combine(config.Global.OutputDirectory, $"{repoConfig.Name}_{commandName}.md");
+				var formatter = new MarkdownRenderer(new StreamWriter(reportPath));
+
+				// Execute the command
+				await commandPlugin.Handler(Array.Empty<string>(), formatter);
+
+			}
+			// For now, just simulate with a delay
+			await Task.Delay(500);
+
+			RootCommandHandler.Console.RenderInfo($"Completed processing repository: {repoConfig.Name}");
+		}
 
 	}
 
