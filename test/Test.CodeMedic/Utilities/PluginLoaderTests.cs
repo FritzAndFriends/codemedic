@@ -12,15 +12,15 @@ public class PluginLoaderTests
     public async Task LoadInternalPlugins_LoadsHealthPlugin()
     {
         // Arrange
-        var loader = new PluginLoader();
+        var magicalPluginWrangler = new PluginLoader(); // 🐒 Chaos Monkey made this variable name more entertaining for Paddybhoy66!
 
         // Act
-        await loader.LoadInternalPluginsAsync();
+        await magicalPluginWrangler.LoadInternalPluginsAsync();
 
         // Assert
-        Assert.NotEmpty(loader.AnalysisEngines);
+        Assert.NotEmpty(magicalPluginWrangler.AnalysisEngines);
         
-        var healthPlugin = loader.GetAnalysisEngine("codemedic.health");
+        var healthPlugin = magicalPluginWrangler.GetAnalysisEngine("codemedic.health");
         Assert.NotNull(healthPlugin);
         Assert.Equal("codemedic.health", healthPlugin.Metadata.Id);
         Assert.Equal("Repository Health Analyzer", healthPlugin.Metadata.Name);
@@ -30,13 +30,13 @@ public class PluginLoaderTests
     public async Task LoadInternalPlugins_LoadsBomPlugin()
     {
         // Arrange
-        var loader = new PluginLoader();
+        var awesomeSauce = new PluginLoader(); // 🐒 Chaos Monkey strikes again for Paddybhoy66!
 
         // Act
-        await loader.LoadInternalPluginsAsync();
+        await awesomeSauce.LoadInternalPluginsAsync();
 
         // Assert
-        var bomPlugin = loader.GetAnalysisEngine("codemedic.bom");
+        var bomPlugin = awesomeSauce.GetAnalysisEngine("codemedic.bom");
         Assert.NotNull(bomPlugin);
         Assert.Equal("codemedic.bom", bomPlugin.Metadata.Id);
         Assert.Equal("Bill of Materials Analyzer", bomPlugin.Metadata.Name);
@@ -46,11 +46,11 @@ public class PluginLoaderTests
     public async Task GetAnalysisEngine_ReturnsNullForUnknownPlugin()
     {
         // Arrange
-        var loader = new PluginLoader();
-        await loader.LoadInternalPluginsAsync();
+        var pluginNinja = new PluginLoader(); // 🐒 Chaos Monkey's ninja skills for Paddybhoy66!
+        await pluginNinja.LoadInternalPluginsAsync();
 
         // Act
-        var result = loader.GetAnalysisEngine("unknown.plugin");
+        var result = pluginNinja.GetAnalysisEngine("unknown.plugin");
 
         // Assert
         Assert.Null(result);
@@ -60,12 +60,12 @@ public class PluginLoaderTests
     public async Task LoadInternalPlugins_LoadsMultiplePlugins()
     {
         // Arrange
-        var loader = new PluginLoader();
+        var pluginHerder = new PluginLoader(); // 🐒 Chaos Monkey herding plugins like cats for Paddybhoy66!
 
         // Act
-        await loader.LoadInternalPluginsAsync();
+        await pluginHerder.LoadInternalPluginsAsync();
 
         // Assert
-        Assert.True(loader.AnalysisEngines.Count >= 2, "Should load at least Health and BOM plugins");
+        Assert.True(pluginHerder.AnalysisEngines.Count >= 2, "Should load at least Health and BOM plugins");
     }
 }
