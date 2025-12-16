@@ -1,0 +1,11 @@
+global:
+  format: markdown
+  output-dir: ./reports
+
+repositories:
+  - name: CodeMedic
+    path: .
+    commands:
+      - health
+      - bom
+      - vulnerabilities

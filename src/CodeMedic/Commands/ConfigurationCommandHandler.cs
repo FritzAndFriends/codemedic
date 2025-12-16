@@ -85,11 +85,21 @@ public class ConfigurationCommandHandler
 				}
 
 				// Get the Formatter plugin for output formatting - we only support markdown for now
-				var reportPath = Path.Combine(config.Global.OutputDirectory, $"{repoConfig.Name}_{commandName}.md");
-				var formatter = new MarkdownRenderer(new StreamWriter(reportPath));
+				// Ensure output directory exists
+				Directory.CreateDirectory(config.Global.OutputDirectory);
 
-				// Execute the command
-				await commandPlugin.Handler(Array.Empty<string>(), formatter);
+				var reportPath = Path.Combine(config.Global.OutputDirectory, $"{repoConfig.Name}_{commandName}.md");
+
+				// Execute the command with proper disposal of the StreamWriter
+				using (var writer = new StreamWriter(reportPath))
+				{
+					var formatter = new MarkdownRenderer(writer);
+
+					// Build arguments array to pass the repository path to the command
+					var commandArgs = new[] { "--path", repoConfig.Path };
+
+					await commandPlugin.Handler(commandArgs, formatter);
+				}
 
 			}
 			// For now, just simulate with a delay
@@ -116,7 +126,9 @@ public class ConfigurationCommandHandler
 		}
 		else if (extension == ".yaml" || extension == ".yml")
 		{
-			var deserializer = new YamlDotNet.Serialization.DeserializerBuilder().Build();
+			// Configure YAML deserializer - we use explicit YamlMember aliases on properties
+			var deserializer = new YamlDotNet.Serialization.DeserializerBuilder()
+				.Build();
 			var config = deserializer.Deserialize<CodeMedicRunConfiguration>(fileContents);
 			if (config == null)
 			{

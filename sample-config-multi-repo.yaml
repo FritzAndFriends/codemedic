@@ -1,0 +1,20 @@
+global:
+  format: markdown
+  output-dir: ./reports/multi
+
+repositories:
+  - name: MainProject
+    path: ./src
+    commands:
+      - health
+      - bom
+
+  - name: TestSuite
+    path: ./test
+    commands:
+      - health
+
+  - name: Documentation
+    path: ./docs
+    commands:
+      - bom

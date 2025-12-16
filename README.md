@@ -30,10 +30,15 @@ dotnet run -- --help
 
 ## 📖 Documentation
 
-- **User Guide:** `user-docs/cli_quick_reference.md`
-- **Docker Guide:** `user-docs/docker_usage.md`
-- **Technical Guide:** `doc/cli_skeleton_implementation.md`
-- **Architecture & Extension:** `doc/cli_architecture.md`
+### User Documentation
+- **CLI Quick Reference:** `user-docs/cli_quick_reference.md`
+- **Configuration Files:** `user-docs/configuration-files.md` - Batch analysis with JSON/YAML
+- **Docker Usage:** `user-docs/docker_usage.md`
+- **Vulnerability Scanning:** `user-docs/vulnerability-scanning.md`
+
+### Technical Documentation
+- **CLI Architecture:** `doc/cli_architecture.md`
+- **Implementation Guide:** `doc/cli_skeleton_implementation.md`
 - **Docker Implementation:** `doc/docker_implementation.md`
 - **Test Results:** `doc/cli_skeleton_test_results.md`
 
@@ -52,6 +57,7 @@ dotnet run -- --help
 - ✅ Multiple output formats (console, markdown)
 - ✅ Path argument support (`-p` / `--path`) for all analysis commands
 - ✅ Command-specific help with argument documentation
+- ✅ **Configuration file support (JSON & YAML) for batch analysis**
 
 ## 🎯 Current Commands
 
@@ -60,6 +66,11 @@ dotnet run -- --help
 codemedic                # Show help (default)
 codemedic --help         # Explicit help
 codemedic --version      # Show version
+
+# Configuration-based batch analysis
+codemedic config <config-file>   # Run multiple analyses from config file
+codemedic config config.json
+codemedic config config.yaml
 
 # Analysis commands
 codemedic health         # Repository health dashboard
