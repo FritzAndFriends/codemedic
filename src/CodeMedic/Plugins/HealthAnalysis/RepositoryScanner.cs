@@ -21,8 +21,8 @@ public class RepositoryScanner
     /// <param name="rootPath">The root directory to scan. Defaults to current directory if null or empty.</param>
     public RepositoryScanner(string? rootPath = null)
     {
-        _rootPath = string.IsNullOrWhiteSpace(rootPath) 
-            ? Directory.GetCurrentDirectory() 
+        _rootPath = string.IsNullOrWhiteSpace(rootPath)
+            ? Directory.GetCurrentDirectory()
             : Path.GetFullPath(rootPath);
         _nugetInspector = new NuGetInspector(_rootPath);
         _vulnerabilityScanner = new VulnerabilityScanner(_rootPath);
@@ -54,6 +54,41 @@ public class RepositoryScanner
 
             // Scan for vulnerabilities after all projects are parsed
             await CollectVulnerabilitiesAsync();
+
+			// Check for any stale NuGet packages - packages that haven't been updated in over a year
+			foreach (var project in _projects)
+			{
+				foreach (var package in project.PackageDependencies)
+				{
+					// get the latest version info from nuget.org
+					var latestPublishedDate = await _nugetInspector.FetchLatestVersionPublishedDateAsync(package.Name);
+
+					// log to the console the package name and published date
+					// Console.WriteLine($"Package: {package.Name}, Latest Published Date: {latestPublishedDate?.ToString("yyyy-MM-dd") ?? "Unknown"}");
+
+					if (latestPublishedDate.HasValue)
+					{
+						var age = DateTime.UtcNow - latestPublishedDate.Value;
+						if (age.TotalDays > 365)
+						{
+
+							//  Console.WriteLine($"Stale Package Detected: {package.Name}, Last Published: {latestPublishedDate.Value:yyyy-MM-dd}, Age: {age.TotalDays:F0} days");
+
+							// add this package to the stale packages metadata
+							if (!project.Metadata.ContainsKey("StalePackages"))
+							{
+								project.Metadata["StalePackages"] = new List<(string PackageName, DateTime PublishedDate)>();
+							}
+
+							// add to the list
+							var staleList = (List<(string PackageName, DateTime PublishedDate)>)project.Metadata["StalePackages"];
+							staleList.Add((package.Name, latestPublishedDate.Value));
+
+						}
+					}
+				}
+			}
+
         }
         catch (Exception ex)
         {
@@ -126,7 +161,7 @@ public class RepositoryScanner
             // this is redundant
 						// summaryKvList.Add("Total Projects", totalProjects.ToString());
             summaryKvList.Add("Production Projects", nonTestProjects.ToString());
-            summaryKvList.Add("Test Projects", testProjectCount.ToString(), 
+            summaryKvList.Add("Test Projects", testProjectCount.ToString(),
                 testProjectCount > 0 ? TextStyle.Success : TextStyle.Warning);
             summaryKvList.Add("Total Lines of Code", totalLinesOfCode.ToString());
             if (testProjectCount > 0)
@@ -245,6 +280,47 @@ public class RepositoryScanner
 
             report.AddSection(noVulnSection);
         }
+
+		// Stale packages section
+		var stalePackages = new Dictionary<string, DateTime>();
+
+		foreach (var project in _projects)
+		{
+			if (project.Metadata.ContainsKey("StalePackages"))
+			{
+				var staleList = (List<(string PackageName, DateTime PublishedDate)>)project.Metadata["StalePackages"];
+				foreach (var (PackageName, PublishedDate) in staleList)
+				{
+					if (!stalePackages.ContainsKey(PackageName))
+					{
+						stalePackages[PackageName] = PublishedDate;
+					}
+				}
+			}
+		}
+
+		if (stalePackages.Count > 0)
+		{
+			var staleSection = new ReportSection
+			{
+				Title = "Stale Packages",
+				Level = 1
+			};
+			staleSection.AddElement(new ReportParagraph(
+				"Consider updating these packages that haven't been updated in over a year.",
+                TextStyle.Warning));
+			var staleList = new ReportList
+			{
+				Title = "Stale Packages"
+			};
+			foreach (var kvp in stalePackages.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
+			{
+				var nugetUrl = $"https://www.nuget.org/packages/{kvp.Key}";
+				staleList.AddItem($"{kvp.Key} (Last published: {kvp.Value:yyyy-MM-dd}) - {nugetUrl}");
+			}
+			staleSection.AddElement(staleList);
+			report.AddSection(staleSection);
+		}
 
         // Projects table section
         if (totalProjects > 0)
@@ -575,7 +651,7 @@ public class RepositoryScanner
             if (!projectInfo.IsTestProject)
             {
                 var testFrameworkPackages = new[] { "xunit", "nunit", "mstest", "microsoft.net.test.sdk", "coverlet" };
-                projectInfo.IsTestProject = projectInfo.PackageDependencies.Any(pkg => 
+                projectInfo.IsTestProject = projectInfo.PackageDependencies.Any(pkg =>
                     testFrameworkPackages.Any(tfp => pkg.Name.Contains(tfp, StringComparison.OrdinalIgnoreCase)));
             }
 
@@ -625,7 +701,7 @@ public class RepositoryScanner
 
         // Mapping based on https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/configure-language-version#defaults
         // and .NET 10 preview announcements
-        if (tfm.StartsWith("net10.0")) return "14"; 
+        if (tfm.StartsWith("net10.0")) return "14";
         if (tfm.StartsWith("net9.0")) return "13";
         if (tfm.StartsWith("net8.0")) return "12";
         if (tfm.StartsWith("net7.0")) return "11";
@@ -756,8 +832,8 @@ public class RepositoryScanner
         {
             var projectDir = Path.GetDirectoryName(projectFilePath) ?? "";
             var csFiles = Directory.EnumerateFiles(projectDir, "*.cs", SearchOption.AllDirectories)
-                .Where(f => !Path.GetFileName(f).StartsWith(".") && 
-                           !f.Contains("\\.vs\\") && 
+                .Where(f => !Path.GetFileName(f).StartsWith(".") &&
+                           !f.Contains("\\.vs\\") &&
                            !f.Contains("\\bin\\") &&
                            !f.Contains("\\obj\\") &&
                            !Path.GetFileName(f).EndsWith(".g.cs"))

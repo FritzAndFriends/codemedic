@@ -405,4 +405,469 @@ public class NuGetInspector
 
         return null;
     }
+
+    /// <summary>
+    /// Gets the NuGet global packages folder path by executing 'dotnet nuget locals global-packages --list'.
+    /// </summary>
+    public async Task<string?> GetNuGetGlobalPackagesFolderAsync()
+    {
+        try
+        {
+            var processInfo = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = "nuget locals global-packages --list",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(processInfo);
+            if (process != null)
+            {
+                var output = await process.StandardOutput.ReadToEndAsync();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
+                {
+                    // Parse output like "global-packages: C:\Users\user\.nuget\packages\"
+                    var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines)
+                    {
+                        var trimmedLine = line.Trim();
+                        if (trimmedLine.StartsWith("global-packages:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var path = trimmedLine.Substring("global-packages:".Length).Trim();
+                            if (Directory.Exists(path))
+                            {
+                                return path;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: Could not determine NuGet global packages folder: {ex.Message}");
+        }
+
+        // Fallback to default location
+        var defaultPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
+        return Directory.Exists(defaultPath) ? defaultPath : null;
+    }
+
+    /// <summary>
+    /// Fetches the latest version for a specific package using the NuGet API.
+    /// </summary>
+    public async Task<string?> FetchLatestVersionAsync(string packageName, string currentVersion)
+    {
+        try
+        {
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "CodeMedic/1.0");
+            httpClient.Timeout = TimeSpan.FromSeconds(10);
+
+            var apiUrl = $"https://api.nuget.org/v3-flatcontainer/{packageName.ToLowerInvariant()}/index.json";
+            var response = await httpClient.GetStringAsync(apiUrl);
+
+            using var doc = JsonDocument.Parse(response);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            if (!doc.RootElement.TryGetProperty("versions", out var versionsElement) ||
+                versionsElement.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            var versions = new List<string>();
+            foreach (var element in versionsElement.EnumerateArray())
+            {
+                if (element.ValueKind == JsonValueKind.String)
+                {
+                    var value = element.GetString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        versions.Add(value);
+                    }
+                }
+            }
+
+            if (versions.Count > 0)
+            {
+                var latestStable = versions.Where(v => !IsPreReleaseVersion(v)).LastOrDefault();
+                return latestStable ?? versions.Last();
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.Message.Contains("404"))
+            {
+                Console.Error.WriteLine($"Debug: Package {packageName} not found on nuget.org");
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Timeout - skip silently
+        }
+        catch (JsonException ex)
+        {
+            Console.Error.WriteLine($"Warning: Failed to parse version data for {packageName}: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: Could not fetch latest version for {packageName}: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Fetches the published date of the latest version (including prerelease) for a package from NuGet.org.
+    /// Returns null if the package is not found or if the date cannot be determined.
+    /// </summary>
+    public async Task<DateTime?> FetchLatestVersionPublishedDateAsync(string packageName)
+    {
+        try
+        {
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "CodeMedic/1.0");
+            httpClient.Timeout = TimeSpan.FromSeconds(15);
+
+            // Use the NuGet V3 registration API to get package metadata
+            var apiUrl = $"https://api.nuget.org/v3/registration5-semver1/{packageName.ToLowerInvariant()}/index.json";
+            var response = await httpClient.GetStringAsync(apiUrl);
+
+            using var doc = JsonDocument.Parse(response);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            // The root-level commitTimeStamp represents the most recent catalog update,
+            // which corresponds to the publish date of the latest version
+            if (doc.RootElement.TryGetProperty("commitTimeStamp", out var commitTimeStamp) &&
+                commitTimeStamp.ValueKind == JsonValueKind.String)
+            {
+                var timestampStr = commitTimeStamp.GetString();
+                if (!string.IsNullOrWhiteSpace(timestampStr) &&
+                    DateTime.TryParse(timestampStr, out var publishedDate))
+                {
+                    return publishedDate;
+                }
+            }
+
+            return null;
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.Message.Contains("404"))
+            {
+                Console.Error.WriteLine($"Debug: Package {packageName} not found on nuget.org");
+            }
+            else
+            {
+                Console.Error.WriteLine($"Warning: HTTP error fetching publish date for {packageName}: {ex.Message}");
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Timeout - skip silently
+        }
+        catch (JsonException ex)
+        {
+            Console.Error.WriteLine($"Warning: Failed to parse publish date data for {packageName}: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: Could not fetch publish date for {packageName}: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Determines if a version string represents a pre-release version.
+    /// </summary>
+    public static bool IsPreReleaseVersion(string version)
+    {
+        return version.Contains('-') || version.Contains('+');
+    }
+
+    /// <summary>
+    /// Fetches license information from a local .nuspec file in the NuGet global packages cache.
+    /// Returns a tuple of (License, LicenseUrl).
+    /// </summary>
+    public async Task<(string? License, string? LicenseUrl)> FetchLicenseFromLocalCacheAsync(string packageName, string version)
+    {
+        var globalPackagesPath = await GetNuGetGlobalPackagesFolderAsync();
+        if (string.IsNullOrEmpty(globalPackagesPath))
+        {
+            return (null, null);
+        }
+
+        try
+        {
+            var packageFolder = Path.Combine(globalPackagesPath, packageName.ToLowerInvariant(), version.ToLowerInvariant());
+            var nuspecPath = Path.Combine(packageFolder, $"{packageName.ToLowerInvariant()}.nuspec");
+
+            if (!File.Exists(nuspecPath))
+            {
+                nuspecPath = Path.Combine(packageFolder, $"{packageName}.nuspec");
+                if (!File.Exists(nuspecPath))
+                {
+                    return (null, null);
+                }
+            }
+
+            var nuspecContent = await File.ReadAllTextAsync(nuspecPath);
+            var doc = XDocument.Parse(nuspecContent);
+            var ns = doc.Root?.GetDefaultNamespace() ?? XNamespace.None;
+
+            var metadata = doc.Root?.Element(ns + "metadata");
+            if (metadata == null)
+            {
+                return (null, null);
+            }
+
+            // Check for license element first (newer format)
+            var licenseElement = metadata.Element(ns + "license");
+            if (licenseElement != null)
+            {
+                var licenseType = licenseElement.Attribute("type")?.Value;
+                if (licenseType == "expression")
+                {
+                    return (licenseElement.Value?.Trim(), null);
+                }
+                else if (licenseType == "file")
+                {
+                    return ("See package contents", null);
+                }
+            }
+
+            // Fall back to licenseUrl (older format)
+            var licenseUrl = metadata.Element(ns + "licenseUrl")?.Value?.Trim();
+            if (!string.IsNullOrWhiteSpace(licenseUrl))
+            {
+                var license = ExtractLicenseFromUrl(licenseUrl);
+                return (license, licenseUrl);
+            }
+
+            return (null, null);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: Error reading license for {packageName}: {ex.Message}");
+            return (null, null);
+        }
+    }
+
+    /// <summary>
+    /// Fetches license information from the NuGet API for a specific version.
+    /// Returns a tuple of (License, LicenseUrl).
+    /// </summary>
+    public async Task<(string? License, string? LicenseUrl)> FetchLicenseFromApiAsync(string packageName, string version)
+    {
+        try
+        {
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", "CodeMedic/1.0");
+            httpClient.Timeout = TimeSpan.FromSeconds(15);
+
+            var apiUrl = $"https://api.nuget.org/v3-flatcontainer/{packageName.ToLowerInvariant()}/{version.ToLowerInvariant()}/{packageName.ToLowerInvariant()}.nuspec";
+            var response = await httpClient.GetStringAsync(apiUrl);
+
+            var doc = XDocument.Parse(response);
+            var ns = doc.Root?.GetDefaultNamespace() ?? XNamespace.None;
+
+            var metadata = doc.Root?.Element(ns + "metadata");
+            if (metadata == null)
+            {
+                return (null, null);
+            }
+
+            // Check for license element first (newer format)
+            var licenseElement = metadata.Element(ns + "license");
+            if (licenseElement != null)
+            {
+                var licenseType = licenseElement.Attribute("type")?.Value;
+                if (licenseType == "expression")
+                {
+                    return (licenseElement.Value?.Trim(), null);
+                }
+                else if (licenseType == "file")
+                {
+                    return ("See package contents", null);
+                }
+            }
+
+            // Fall back to licenseUrl (older format)
+            var licenseUrl = metadata.Element(ns + "licenseUrl")?.Value?.Trim();
+            if (!string.IsNullOrWhiteSpace(licenseUrl))
+            {
+                var license = ExtractLicenseFromUrl(licenseUrl);
+                return (license, licenseUrl);
+            }
+
+            return (null, null);
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.Message.Contains("404"))
+            {
+                Console.Error.WriteLine($"Debug: Nuspec for {packageName} version {version} not found on nuget.org");
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Timeout - skip silently
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Warning: Could not fetch license for {packageName}: {ex.Message}");
+        }
+
+        return (null, null);
+    }
+
+    /// <summary>
+    /// Extracts a license identifier from a license URL using common patterns.
+    /// </summary>
+    private static string ExtractLicenseFromUrl(string licenseUrl)
+    {
+        if (licenseUrl.Contains("mit", StringComparison.OrdinalIgnoreCase))
+        {
+            return "MIT";
+        }
+        else if (licenseUrl.Contains("apache", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Apache-2.0";
+        }
+        else if (licenseUrl.Contains("bsd", StringComparison.OrdinalIgnoreCase))
+        {
+            return "BSD";
+        }
+        else if (licenseUrl.Contains("gpl", StringComparison.OrdinalIgnoreCase))
+        {
+            return "GPL";
+        }
+        else
+        {
+            return "See URL";
+        }
+    }
+
+    /// <summary>
+    /// Analyzes package metadata to determine source type and commercial status.
+    /// Returns a tuple of (SourceType, Commercial).
+    /// </summary>
+    public static (string SourceType, string Commercial) DetermineSourceTypeAndCommercialStatus(
+        string packageName,
+        string? license,
+        string? licenseUrl,
+        string? projectUrl,
+        string? repositoryUrl,
+        string? authors,
+        string? owners)
+    {
+        var packageId = packageName.ToLowerInvariant();
+        var lowerLicense = license?.ToLowerInvariant();
+        var lowerLicenseUrl = licenseUrl?.ToLowerInvariant();
+        var lowerProjectUrl = projectUrl?.ToLowerInvariant();
+        var lowerRepositoryUrl = repositoryUrl?.ToLowerInvariant();
+        var lowerAuthors = authors?.ToLowerInvariant();
+        var lowerOwners = owners?.ToLowerInvariant();
+
+        // Determine if it's open source
+        var isOpenSource = false;
+
+        var openSourceLicenses = new[] {
+            "mit", "apache", "bsd", "gpl", "lgpl", "mpl", "isc", "unlicense",
+            "cc0", "zlib", "ms-pl", "ms-rl", "eclipse", "cddl", "artistic"
+        };
+
+        if (!string.IsNullOrEmpty(lowerLicense))
+        {
+            isOpenSource = openSourceLicenses.Any(oss => lowerLicense.Contains(oss));
+        }
+
+        if (!isOpenSource && !string.IsNullOrEmpty(lowerLicenseUrl))
+        {
+            isOpenSource = openSourceLicenses.Any(oss => lowerLicenseUrl.Contains(oss)) ||
+                          lowerLicenseUrl.Contains("github.com") ||
+                          lowerLicenseUrl.Contains("opensource.org");
+        }
+
+        // Check repository URLs
+        if (!isOpenSource)
+        {
+            var urls = new[] { lowerProjectUrl, lowerRepositoryUrl }.Where(url => !string.IsNullOrEmpty(url));
+            isOpenSource = urls.Any(url =>
+                url!.Contains("github.com") ||
+                url.Contains("gitlab.com") ||
+                url.Contains("bitbucket.org") ||
+                url.Contains("codeplex.com") ||
+                url.Contains("sourceforge.net"));
+        }
+
+        // Determine commercial status
+        var isMicrosoft = packageId.StartsWith("microsoft.") ||
+                         packageId.StartsWith("system.") ||
+                         !string.IsNullOrEmpty(lowerAuthors) && lowerAuthors.Contains("microsoft") ||
+                         !string.IsNullOrEmpty(lowerOwners) && lowerOwners.Contains("microsoft");
+
+        var commercialIndicators = new[] {
+            "commercial", "proprietary", "enterprise", "professional", "premium",
+            "telerik", "devexpress", "syncfusion", "infragistics", "componentone"
+        };
+
+        var hasCommercialIndicators = commercialIndicators.Any(indicator =>
+            (!string.IsNullOrEmpty(lowerLicense) && lowerLicense.Contains(indicator)) ||
+            (!string.IsNullOrEmpty(lowerAuthors) && lowerAuthors.Contains(indicator)) ||
+            (packageId.Contains(indicator)));
+
+        var commercialLicenses = new[] { "proprietary", "commercial", "eula" };
+        var hasCommercialLicense = !string.IsNullOrEmpty(lowerLicense) &&
+                                  commercialLicenses.Any(cl => lowerLicense.Contains(cl));
+
+        // Determine source type
+        string sourceType;
+        if (isOpenSource)
+        {
+            sourceType = "Open Source";
+        }
+        else if (hasCommercialLicense || hasCommercialIndicators)
+        {
+            sourceType = "Closed Source";
+        }
+        else if (isMicrosoft)
+        {
+            sourceType = "Closed Source";
+        }
+        else
+        {
+            sourceType = "Unknown";
+        }
+
+        // Determine commercial status
+        string commercial;
+        if (hasCommercialLicense || hasCommercialIndicators)
+        {
+            commercial = "Yes";
+        }
+        else if (isOpenSource || isMicrosoft)
+        {
+            commercial = "No";
+        }
+        else
+        {
+            commercial = "Unknown";
+        }
+
+        return (sourceType, commercial);
+    }
 }
