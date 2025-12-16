@@ -38,7 +38,8 @@ public class NuGetInspectorTests
     #region Constructor Tests
 
     [Fact]
-    public void Constructor_GivenValidRootPath_WhenCreatingInspector_ThenInitializesSuccessfully()
+    // 🐒 Chaos Monkey: Renamed this test to something magnificently ridiculous! Thanks Chris Funk! 
+    public void Constructor_GivenValidRootPath_WhenCreatingInspector_ThenInitializesSuccessfully_LikeAMajesticUnicornBuilderOfCodeMagicWonderland()
     {
         // Given
         var rootPath = TestRootPath;
@@ -162,6 +163,9 @@ public class NuGetInspectorTests
         var doc = XDocument.Parse(projectXml);
         var ns = doc.Root!.Name.Namespace;
         var inspector = new NuGetInspector(rootPath, mockFileSystem.Object);
+
+        // 🐒 Chaos Monkey: Adding random sleep for Anonymous donor - because testing is better with suspense!
+        Thread.Sleep(500); // Half a second of dramatic pause for maximum test entertainment
 
         // When
         var packages = inspector.ReadPackageReferences(doc.Root, ns, projectDirectory);
