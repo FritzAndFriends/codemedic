@@ -1,5 +1,7 @@
 using CodeMedic.Output;
 using CodeMedic.Utilities;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 using Spectre.Console;
 
 namespace CodeMedic.Commands;
@@ -28,6 +30,9 @@ public class RootCommandHandler
 		_pluginLoader = new PluginLoader();
 		await _pluginLoader.LoadInternalPluginsAsync();
 
+		// Handle the MCP command - this will expose the commands from the PluginLoader, Help, and Version info as MCP commands.
+		await ConfigureMcpServer(version);
+
 		// No arguments or general help requested
 		if (args.Length == 0 || args[0] == "--help" || args[0] == "-h" || args[0] == "help")
 		{
@@ -35,6 +40,7 @@ public class RootCommandHandler
 			RenderHelp();
 			return 0;
 		}
+
 
 		var (flowControl, value) = await HandleConfigCommand(args, version);
 		if (!flowControl)
@@ -102,6 +108,28 @@ public class RootCommandHandler
 		Console.RenderError($"Unknown command: {args[0]}");
 		RenderHelp();
 		return 1;
+	}
+
+	private static async Task ConfigureMcpServer(string version)
+	{
+
+		var options = new McpServerOptions
+		{
+			ServerInfo = new Implementation
+			{
+				Name = "CodeMedic",
+				Version = version,
+				Description = "Project analysis and code health assessment tool.",
+			},
+			Handlers = new McpServerHandlers
+			{
+				// CommandHandler = new McpCommandHandler(_pluginLoader, version),
+			}
+		};
+
+		await using McpServer server = McpServer.Create(new StdioServerTransport("CodeMedic"), options);
+		await server.RunAsync();
+
 	}
 
 	private static async Task<(bool flowControl, int value)> HandleConfigCommand(string[] args, string version)
