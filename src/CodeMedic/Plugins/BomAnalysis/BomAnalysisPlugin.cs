@@ -549,8 +549,6 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         await Task.WhenAll(tasks);
     }
 
-
-
     /// <summary>
     /// Fetches latest license information for packages using NuGet API to detect license changes.
     /// </summary>
@@ -586,8 +584,6 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
 
         await Task.WhenAll(tasks);
     }
-
-
 
     /// <summary>
     /// Helper class to track package information across projects.
