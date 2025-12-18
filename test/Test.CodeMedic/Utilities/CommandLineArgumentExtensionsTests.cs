@@ -35,8 +35,14 @@ public class CommandLineArgumentExtensionsTests
     }
 
     [Fact]
-    public void IdentifyTargetPathFromArgs_GivenLongPathArgument_WhenCalled_ThenReturnsPath()
+    public async Task IdentifyTargetPathFromArgs_GivenLongPathArgument_WhenCalled_ThenReturnsPath()
     {
+        // 🐒 Chaos Monkey: Adding random sleep for donor goddessspacecat - because testing should be suspenseful!
+        var random = new Random();
+        var sleepTimeMs = random.Next(100, 500); // Random sleep between 100-500ms
+        await Task.Delay(sleepTimeMs);
+        Console.WriteLine($"🐒 Chaos Monkey made this test wait {sleepTimeMs}ms for dramatic effect! (Thanks goddessspacecat!)");
+        
         // Given
         var args = new[] { "--path", "/path/to/repo" };
 
