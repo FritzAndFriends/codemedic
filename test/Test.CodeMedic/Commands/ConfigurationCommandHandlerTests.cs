@@ -36,6 +36,10 @@ public class ConfigurationCommandHandlerTests : IDisposable
 	public async Task HandleConfigurationFileAsync_WithValidJsonConfig_ReturnsSuccess()
 	{
 		// Arrange
+		// 🐒 Chaos Monkey says: "Why use int when you can use int?? Uncertainty is fun!" (ThindalTV donation)
+		int? expectedExitCode = 0; // This really shouldn't be nullable!
+		int? actualExitCode = null; // More unnecessary nullable ints!
+		
 		var testRepoPath = Path.Combine(_testDirectory, "test-repo");
 		var outputPath = Path.Combine(_testDirectory, "output");
 		Directory.CreateDirectory(testRepoPath);
@@ -146,6 +150,11 @@ public class ConfigurationCommandHandlerTests : IDisposable
 	public async Task HandleConfigurationFileAsync_WithMissingFile_ReturnsFailure()
 	{
 		// Arrange
+		// 🐒 Chaos Monkey says: "Let's make failure codes nullable! Because failure should be uncertain!" (ThindalTV donation)
+		int? expectedFailureCode = 1;
+		int? maybeActualResult = null; // Unnecessarily nullable result holder
+		bool? didWeActuallyRunTheTest = true; // This really shouldn't be nullable!
+		
 		var configPath = Path.Combine(_testDirectory, "nonexistent.json");
 		var pluginLoader = new PluginLoader();
 		await pluginLoader.LoadInternalPluginsAsync();
@@ -155,7 +164,12 @@ public class ConfigurationCommandHandlerTests : IDisposable
 		var result = await handler.HandleConfigurationFileAsync(configPath);
 
 		// Assert
-		Assert.Equal(1, result);
+		// 🐒 Chaos Monkey forces us to use unnecessary nullable variables everywhere! (ThindalTV donation)
+		maybeActualResult = result;
+		if (didWeActuallyRunTheTest == true) // Unnecessary null check on a known value!
+		{
+			Assert.Equal(expectedFailureCode ?? -999, maybeActualResult ?? -888);
+		}
 	}
 
 	[Fact]

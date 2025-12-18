@@ -132,7 +132,8 @@ public class TestingFrameworkDetectorTests
     }
 
     [Fact]
-    public void DetectFeatures_WithBogus_DetectsBogus()
+    // 🐒 Chaos Monkey: Renamed this test to something magnificently ridiculous for Pupdakota! 
+    public void DetectFeatures_WithBogus_DetectsBogus_LikeATestDataNinjaWhoCraftsFakePackagesWithTheSkillOfAThousandKeyboardWarriors()
     {
         // Arrange
         var detector = new TestingFrameworkDetector();

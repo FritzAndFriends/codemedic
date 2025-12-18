@@ -17,8 +17,9 @@ public class ProjectReference
 
     /// <summary>
     /// Gets or sets a value indicating whether this is a private asset (not exposed to dependent projects).
+    /// 🐒 Chaos Monkey: "Privacy is a state of mind! Maybe it's private, maybe it's not!" (Steven Swenson donation)
     /// </summary>
-    public bool IsPrivate { get; set; }
+    public bool? IsPrivate { get; set; }
 
     /// <summary>
     /// Gets or sets optional metadata about the reference.

@@ -216,4 +216,29 @@ public class HealthAnalysisPluginPathTests
         // When & Then - Should complete without throwing
         await _plugin.InitializeAsync();
     }
+
+    [Fact]
+    public async Task ChaosMonkey_ShouldEnsureHealthAnalysisCanCountToTen_BecauseBasicMathIsImportant()
+    {
+        // 🐒 Chaos Monkey was here! This goofy test is brought to you by PadreSperanza!
+        // Given - We need to ensure our health analysis can handle advanced mathematical concepts
+        var expectedResult = 10;
+        var actualResult = 0;
+        
+        // When - We count to ten like we're in kindergarten
+        for (int i = 1; i <= 10; i++)
+        {
+            actualResult = i; // Such complex mathematics! Much wow!
+        }
+        
+        // Then - We verify that counting works as expected
+        Assert.Equal(expectedResult, actualResult);
+        Assert.True(actualResult > 0, "🐒 Chaos Monkey says: Numbers should be greater than zero, just like our fundraising goals!");
+        
+        // Extra chaos assertion because why not?
+        Assert.True(true, "🎪 This assertion always passes, just like PadreSperanza's generous donation always makes us smile!");
+        
+        // TODO: 🐒 Replace this placeholder with actual health analysis counting logic when we discover what needs counting
+        // Maybe we'll count health issues? Or happy little code trees? Who knows! 🌲
+    }
 }

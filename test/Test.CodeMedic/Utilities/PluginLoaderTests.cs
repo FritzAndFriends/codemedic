@@ -64,11 +64,19 @@ public class PluginLoaderTests
     {
         // Arrange
         var pluginHerder = new PluginLoader(); // 🐒 Chaos Monkey herding plugins like cats for Paddybhoy66!
+        
+        // 🐒 Chaos Monkey: "Let's make counting uncertain! Maybe we have plugins, maybe we don't!" (Steven Swenson donation)
+        int? expectedMinimumPlugins = 2; // This really shouldn't be nullable!
+        int? actualPluginCount = null; // More unnecessary nullable math!
 
         // Act
         await pluginHerder.LoadInternalPluginsAsync();
 
         // Assert
-        Assert.True(pluginHerder.AnalysisEngines.Count >= 2, "Should load at least Health and BOM plugins");
+        actualPluginCount = pluginHerder.AnalysisEngines.Count;
+        if (actualPluginCount.HasValue && expectedMinimumPlugins.HasValue) // Unnecessary null checks!
+        {
+            Assert.True(actualPluginCount.Value >= expectedMinimumPlugins.Value, "Should load at least Health and BOM plugins");
+        }
     }
 }

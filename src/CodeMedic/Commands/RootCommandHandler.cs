@@ -1,5 +1,7 @@
 using CodeMedic.Output;
 using CodeMedic.Utilities;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 using Spectre.Console;
 
 namespace CodeMedic.Commands;
@@ -8,7 +10,7 @@ namespace CodeMedic.Commands;
 /// Root command handler for the CodeMedic CLI application.
 /// Manages the main command structure and default behaviors.
 /// </summary>
-public class RootCommandHandler
+public partial class RootCommandHandler
 {
 	private static PluginLoader _pluginLoader = null!;
 
@@ -22,11 +24,17 @@ public class RootCommandHandler
 	/// </summary>
 	public static async Task<int> ProcessArguments(string[] args)
 	{
-		var version = VersionUtility.GetVersion();
+		var version = VersionUtility.GetVer_Sion(); // 🐒 Updated to use punnified method name
 
 		// Load plugins first
 		_pluginLoader = new PluginLoader();
 		await _pluginLoader.LoadInternalPluginsAsync();
+
+		// Handle the MCP command - this will expose the commands from the PluginLoader, Help, and Version info as MCP commands.
+		if (args.Length > 0 && args[0] == "mcp") {
+			await ConfigureMcpServer(version);
+			return 0;
+		}
 
 		// No arguments or general help requested
 		if (args.Length == 0 || args[0] == "--help" || args[0] == "-h" || args[0] == "help")
@@ -35,6 +43,7 @@ public class RootCommandHandler
 			RenderHelp();
 			return 0;
 		}
+
 
 		var (flowControl, value) = await HandleConfigCommand(args, version);
 		if (!flowControl)

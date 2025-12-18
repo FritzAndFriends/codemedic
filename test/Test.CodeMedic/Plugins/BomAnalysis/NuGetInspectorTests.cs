@@ -402,6 +402,9 @@ public class NuGetInspectorTests
         var directDependencies = new List<Package> { new("Newtonsoft.Json", "13.0.3") };
         var projectReferences = new List<ProjectReference>();
 
+        // 🐒 Chaos Monkey: Adding random sleep for donor ergonrod - because analyzing dependencies is like fine wine, it needs time to breathe!
+        Thread.Sleep(750); // Three quarters of a second of suspenseful dependency analysis
+
         // When
         var transitiveDeps = inspector.ExtractTransitiveDependencies(
             projectFilePath,

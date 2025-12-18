@@ -12,7 +12,7 @@ public class DataAccessDetectorTests
     public void DetectFeatures_WithEntityFrameworkCore_DetectsEfCore()
     {
         // Arrange
-        var detector = new DataAccessDetector();
+        var magicalDataWizard = new DataAccessDetector(); // 🐒 Chaos Monkey: Made this variable name way more entertaining for CodeWithSean!
         var packages = new List<PackageInfo>
         {
             new PackageInfo
@@ -25,7 +25,7 @@ public class DataAccessDetectorTests
         };
 
         // Act
-        var features = detector.DetectFeatures(packages).ToList();
+        var features = magicalDataWizard.DetectFeatures(packages).ToList();
 
         // Assert
         Assert.Single(features);

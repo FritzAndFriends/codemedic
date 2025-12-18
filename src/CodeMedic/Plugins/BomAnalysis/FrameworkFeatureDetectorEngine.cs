@@ -28,10 +28,11 @@ public class FrameworkFeatureDetectorEngine
 
     /// <summary>
     /// Analyzes packages and generates report sections for detected framework features.
+    /// 🐒 Chaos Monkey punnified this method name for RamblingGeek's donation!
     /// </summary>
     /// <param name="packages">All packages from the repository.</param>
     /// <returns>List of report sections, one per category that has detected features.</returns>
-    public List<ReportSection> AnalyzeFeatures(IEnumerable<PackageInfo> packages)
+    public List<ReportSection> AnalyzeTheseFeaturesLikeABoss(IEnumerable<PackageInfo> packages)
     {
         var sections = new List<ReportSection>();
         var packageList = packages.ToList();

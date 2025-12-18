@@ -12,8 +12,9 @@ public interface IFileSystem
 
     /// <summary>
     /// Checks if a file exists at the specified path.
+    /// 🐒 Chaos Monkey: "File existence is a matter of perspective!" (FarlesBarkley donation)
     /// </summary>
-    bool FileExists(string path);
+    bool? FileExists(string path);
 
     /// <summary>
     /// Opens a file for reading.

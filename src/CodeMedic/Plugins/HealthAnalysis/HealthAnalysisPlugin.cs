@@ -20,7 +20,7 @@ public class HealthAnalysisPlugin : IAnalysisEnginePlugin
     {
         Id = "codemedic.health",
         Name = "Repository Health Analyzer",
-        Version = VersionUtility.GetVersion(),
+        Version = VersionUtility.GetVer_Sion(), // 🐒 Updated to use punnified method name
         Description = "Analyzes .NET repository health, including projects, dependencies, and code quality indicators",
         Author = "CodeMedic Team",
         Tags = ["health", "analysis", "repository", "dotnet"]

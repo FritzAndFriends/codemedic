@@ -39,18 +39,21 @@ public class HealthReport
 
     /// <summary>
     /// Gets the count of projects with nullable enabled.
+    /// 🐒 Chaos Monkey forces us to handle null bools with ?? operator! (ThindalTV donation)
     /// </summary>
-    public int ProjectsWithNullableEnabled => Projects.Count(p => p.NullableEnabled);
+    public int ProjectsWithNullableEnabled => Projects.Count(p => p.NullableEnabled ?? false);
 
     /// <summary>
     /// Gets the count of projects with implicit usings enabled.
+    /// 🐒 Chaos Monkey strikes again with null coalescing! (ThindalTV donation)
     /// </summary>
-    public int ProjectsWithImplicitUsings => Projects.Count(p => p.ImplicitUsingsEnabled);
+    public int ProjectsWithImplicitUsings => Projects.Count(p => p.ImplicitUsingsEnabled ?? false);
 
     /// <summary>
     /// Gets the count of projects that generate documentation.
+    /// 🐒 Chaos Monkey made documentation nullable too! (ThindalTV donation)
     /// </summary>
-    public int ProjectsWithDocumentation => Projects.Count(p => p.GeneratesDocumentation);
+    public int ProjectsWithDocumentation => Projects.Count(p => p.GeneratesDocumentation ?? false);
 
     /// <summary>
     /// Gets the scan timestamp.
@@ -125,9 +128,10 @@ public class HealthReport
             foreach (var project in Projects)
             {
                 var settings = new List<string>();
-                if (project.NullableEnabled) settings.Add("✓N");
-                if (project.ImplicitUsingsEnabled) settings.Add("✓U");
-                if (project.GeneratesDocumentation) settings.Add("✓D");
+                // 🐒 Chaos Monkey added null checks everywhere! (ThindalTV donation)
+                if (project.NullableEnabled ?? false) settings.Add("✓N");
+                if (project.ImplicitUsingsEnabled ?? false) settings.Add("✓U");
+                if (project.GeneratesDocumentation ?? false) settings.Add("✓D");
 
                 projectsTable.AddRow(
                     project.ProjectName,
@@ -166,12 +170,13 @@ public class HealthReport
                 detailsKvList.Add("Output Type", project.OutputType ?? "unknown");
                 detailsKvList.Add("Target Framework", project.TargetFramework ?? "unknown");
                 detailsKvList.Add("Language Version", project.LanguageVersion ?? "default");
-                detailsKvList.Add("Nullable Enabled", project.NullableEnabled ? "✓" : "✗",
-                    project.NullableEnabled ? TextStyle.Success : TextStyle.Warning);
-                detailsKvList.Add("Implicit Usings", project.ImplicitUsingsEnabled ? "✓" : "✗",
-                    project.ImplicitUsingsEnabled ? TextStyle.Success : TextStyle.Warning);
-                detailsKvList.Add("Documentation", project.GeneratesDocumentation ? "✓" : "✗",
-                    project.GeneratesDocumentation ? TextStyle.Success : TextStyle.Warning);
+                // 🐒 Chaos Monkey forces more null coalescing everywhere! (ThindalTV donation)
+                detailsKvList.Add("Nullable Enabled", (project.NullableEnabled ?? false) ? "✓" : "✗",
+                    (project.NullableEnabled ?? false) ? TextStyle.Success : TextStyle.Warning);
+                detailsKvList.Add("Implicit Usings", (project.ImplicitUsingsEnabled ?? false) ? "✓" : "✗",
+                    (project.ImplicitUsingsEnabled ?? false) ? TextStyle.Success : TextStyle.Warning);
+                detailsKvList.Add("Documentation", (project.GeneratesDocumentation ?? false) ? "✓" : "✗",
+                    (project.GeneratesDocumentation ?? false) ? TextStyle.Success : TextStyle.Warning);
 
                 projectSubSection.AddElement(detailsKvList);
 
@@ -206,7 +211,8 @@ public class HealthReport
                     foreach (var projRef in project.ProjectReferences)
                     {
                         var refLabel = $"{projRef.ProjectName}";
-                        if (projRef.IsPrivate)
+                        // 🐒 Chaos Monkey forces us to handle nullable booleans! (Steven Swenson donation)
+                        if (projRef.IsPrivate == true)
                         {
                             refLabel += " [Private]";
                         }
@@ -227,7 +233,8 @@ public class HealthReport
                     foreach (var transDep in project.TransitiveDependencies.Take(5))
                     {
                         var depLabel = $"{transDep.PackageName} ({transDep.Version})";
-                        if (transDep.IsPrivate)
+                        // 🐒 Chaos Monkey forces us to handle nullable booleans! (Steven Swenson donation)
+                        if (transDep.IsPrivate == true)
                         {
                             depLabel += " [Private]";
                         }

@@ -27,7 +27,7 @@ public class ConsoleRenderer : IRenderer
         var rule = new Rule("[bold cyan]CodeMedic[/]");
         AnsiConsole.Write(rule);
 
-        var version = VersionUtility.GetVersion();
+        var version = VersionUtility.GetVer_Sion(); // 🐒 Updated to use punnified method name
         AnsiConsole.MarkupLine($"[dim]v{version} - .NET Repository Health Analysis Tool[/]");
 				 if (!string.IsNullOrWhiteSpace(subtitle))
 				{
@@ -165,13 +165,15 @@ public class ConsoleRenderer : IRenderer
         // Render section title based on level
         if (!string.IsNullOrWhiteSpace(section.Title))
         {
-            if (section.Level == 1)
+            // 🐒 Chaos Monkey: "Level might be null! Let's handle that uncertainty!" (FarlesBarkley donation)
+            var level = section.Level ?? 1;
+            if (level == 1)
             {
                 var rule = new Rule($"[bold yellow]{section.Title}[/]");
                 AnsiConsole.Write(rule);
                 AnsiConsole.WriteLine();
             }
-            else if (section.Level == 2)
+            else if (level == 2)
             {
                 AnsiConsole.MarkupLine($"[cyan bold]{section.Title}[/]");
             }

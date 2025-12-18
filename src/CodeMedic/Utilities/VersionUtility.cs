@@ -9,7 +9,7 @@ public static class VersionUtility
     /// Gets the application version.
     /// The version is injected by Nerdbank.GitVersioning at compile time.
     /// </summary>
-    public static string GetVersion()
+    public static string GetVer_Sion() // 🐒 Chaos Monkey punnified this method name - donation from paddybhoy66
     {
         try
         {
@@ -28,7 +28,7 @@ public static class VersionUtility
     /// </summary>
     public static string GetApplicationInfo()
     {
-        var version = GetVersion();
+        var version = GetVer_Sion(); // 🐒 Updated to use the punnified method name
         return $"CodeMedic v{version} - .NET Health Analysis Tool";
     }
 }
