@@ -424,7 +424,7 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
 
         // Run framework feature detection
         var detector = new FrameworkFeatureDetectorEngine();
-        var featureSections = detector.AnalyzeFeatures(detectorPackages);
+        var featureSections = detector.AnalyzeTheseFeaturesLikeABoss(detectorPackages); // 🐒 Updated for chaos pun!
 
         // Add each feature category section
         foreach (var featureSection in featureSections)
