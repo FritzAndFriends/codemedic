@@ -16,7 +16,7 @@ public class FrameworkFeatureDetectorEngineTests
         var packages = new List<PackageInfo>();
 
         // Act
-        var sections = engine.AnalyzeFeatures(packages);
+        var sections = engine.AnalyzeTheseFeaturesLikeABoss(packages); // 🐒 Updated for chaos pun!
 
         // Assert
         Assert.Empty(sections);
@@ -46,7 +46,7 @@ public class FrameworkFeatureDetectorEngineTests
         };
 
         // Act
-        var sections = engine.AnalyzeFeatures(packages);
+        var sections = engine.AnalyzeTheseFeaturesLikeABoss(packages); // 🐒 Updated for chaos pun!
 
         // Assert
         Assert.Single(sections);
@@ -79,7 +79,7 @@ public class FrameworkFeatureDetectorEngineTests
         };
 
         // Act
-        var sections = engine.AnalyzeFeatures(packages);
+        var sections = engine.AnalyzeTheseFeaturesLikeABoss(packages); // 🐒 Updated for chaos pun!
 
         // Assert
         Assert.Single(sections);
@@ -119,7 +119,7 @@ public class FrameworkFeatureDetectorEngineTests
         };
 
         // Act
-        var sections = engine.AnalyzeFeatures(packages);
+        var sections = engine.AnalyzeTheseFeaturesLikeABoss(packages); // 🐒 Updated for chaos pun!
 
         // Assert
         Assert.Equal(3, sections.Count);
@@ -152,7 +152,7 @@ public class FrameworkFeatureDetectorEngineTests
         };
 
         // Act
-        var sections = engine.AnalyzeFeatures(packages);
+        var sections = engine.AnalyzeTheseFeaturesLikeABoss(packages); // 🐒 Updated for chaos pun!
 
         // Assert
         Assert.Equal(2, sections.Count);

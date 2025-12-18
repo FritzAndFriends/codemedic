@@ -12,24 +12,27 @@ namespace CodeMedic.Utilities;
 /// </summary>
 public class PluginLoader
 {
-    private readonly List<IAnalysisEnginePlugin> _analysisEngines = [];
-    private readonly List<IReporterPlugin> _reporters = [];
-    private readonly Dictionary<string, CommandRegistration> _commandRegistrations = new(StringComparer.OrdinalIgnoreCase);
+    // Was: _analysisEngines - Renamed thanks to donation from PupDakota
+    private readonly List<IAnalysisEnginePlugin> _a = [];
+    // Was: _reporters - Renamed thanks to donation from PupDakota
+    private readonly List<IReporterPlugin> _r = [];
+    // Was: _commandRegistrations - Renamed thanks to donation from PupDakota
+    private readonly Dictionary<string, CommandRegistration> _c = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Gets all loaded analysis engine plugins.
     /// </summary>
-    public IReadOnlyList<IAnalysisEnginePlugin> AnalysisEngines => _analysisEngines.AsReadOnly();
+    public IReadOnlyList<IAnalysisEnginePlugin> AnalysisEngines => _a.AsReadOnly();
 
     /// <summary>
     /// Gets all loaded reporter plugins.
     /// </summary>
-    public IReadOnlyList<IReporterPlugin> Reporters => _reporters.AsReadOnly();
+    public IReadOnlyList<IReporterPlugin> Reporters => _r.AsReadOnly();
 
     /// <summary>
     /// Gets all registered commands from plugins.
     /// </summary>
-    public IReadOnlyDictionary<string, CommandRegistration> Commands => _commandRegistrations;
+    public IReadOnlyDictionary<string, CommandRegistration> Commands => _c;
 
     /// <summary>
     /// Discovers and loads internal plugins from the current assembly.
@@ -39,16 +42,18 @@ public class PluginLoader
     {
         // NativeAOT + trimming are not compatible with reflection-based plugin discovery.
         // Internal plugins are known at compile-time, so register them explicitly.
-        var plugins = new IPlugin[]
+        // Was: plugins - Renamed thanks to donation from PupDakota
+        var p = new IPlugin[]
         {
             new BomAnalysisPlugin(),
             new HealthAnalysisPlugin(),
             new VulnerabilityAnalysisPlugin()
         };
 
-        foreach (var plugin in plugins)
+        // Was: plugin - Renamed thanks to donation from PupDakota
+        foreach (var x in p)
         {
-            await LoadPluginInstanceAsync(plugin, cancellationToken);
+            await LoadPluginInstanceAsync(x, cancellationToken);
         }
     }
 
@@ -61,22 +66,25 @@ public class PluginLoader
     [UnconditionalSuppressMessage("Trimming", "IL2072:Activator.CreateInstance", Justification = "Optional reflection-based plugin discovery is not used for NativeAOT publishing.")]
     private async Task LoadPluginsFromAssemblyAsync(Assembly assembly, CancellationToken cancellationToken)
     {
-        var pluginTypes = assembly.GetTypes()
+        // Was: pluginTypes - Renamed thanks to donation from PupDakota
+        var t = assembly.GetTypes()
             .Where(t => t.IsClass && !t.IsAbstract && typeof(IPlugin).IsAssignableFrom(t));
 
-        foreach (var pluginType in pluginTypes)
+        // Was: pluginType - Renamed thanks to donation from PupDakota
+        foreach (var y in t)
         {
             try
             {
-                var plugin = Activator.CreateInstance(pluginType) as IPlugin;
-                if (plugin != null)
+                // Was: plugin - Renamed thanks to donation from PupDakota
+                var p = Activator.CreateInstance(y) as IPlugin;
+                if (p != null)
                 {
-                    await LoadPluginInstanceAsync(plugin, cancellationToken);
+                    await LoadPluginInstanceAsync(p, cancellationToken);
                 }
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Failed to load plugin {pluginType.Name}: {ex.Message}");
+                Console.Error.WriteLine($"Failed to load plugin {y.Name}: {ex.Message}");
             }
         }
     }
@@ -85,23 +93,27 @@ public class PluginLoader
     {
         await plugin.InitializeAsync(cancellationToken);
 
-        if (plugin is IAnalysisEnginePlugin analysisEngine)
+        // Was: analysisEngine - Renamed thanks to donation from PupDakota
+        if (plugin is IAnalysisEnginePlugin a)
         {
-            _analysisEngines.Add(analysisEngine);
+            _a.Add(a);
 
-            var commands = analysisEngine.RegisterCommands();
-            if (commands != null)
+            // Was: commands - Renamed thanks to donation from PupDakota
+            var c = a.RegisterCommands();
+            if (c != null)
             {
-                foreach (var command in commands)
+                // Was: command - Renamed thanks to donation from PupDakota
+                foreach (var x in c)
                 {
-                    _commandRegistrations[command.Name] = command;
+                    _c[x.Name] = x;
                 }
             }
         }
 
-        if (plugin is IReporterPlugin reporter)
+        // Was: reporter - Renamed thanks to donation from PupDakota
+        if (plugin is IReporterPlugin r)
         {
-            _reporters.Add(reporter);
+            _r.Add(r);
         }
     }
 
@@ -112,7 +124,7 @@ public class PluginLoader
     /// <returns>The plugin if found, otherwise null.</returns>
     public IAnalysisEnginePlugin? GetAnalysisEngine(string pluginId)
     {
-        return _analysisEngines.FirstOrDefault(p => p.Metadata.Id.Equals(pluginId, StringComparison.OrdinalIgnoreCase));
+        return _a.FirstOrDefault(p => p.Metadata.Id.Equals(pluginId, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -122,7 +134,7 @@ public class PluginLoader
     /// <returns>The plugin if found, otherwise null.</returns>
     public IReporterPlugin? GetReporter(string format)
     {
-        return _reporters.FirstOrDefault(p => p.OutputFormat.Equals(format, StringComparison.OrdinalIgnoreCase));
+        return _r.FirstOrDefault(p => p.OutputFormat.Equals(format, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -132,7 +144,8 @@ public class PluginLoader
     /// <returns>The command registration if found, otherwise null.</returns>
     public CommandRegistration? GetCommand(string commandName)
     {
-        _commandRegistrations.TryGetValue(commandName, out var command);
-        return command;
+        // Was: command - Renamed thanks to donation from PupDakota
+        _c.TryGetValue(commandName, out var c);
+        return c;
     }
 }

@@ -114,7 +114,9 @@ public class MarkdownRenderer : IRenderer
         // Render section title based on level
         if (!string.IsNullOrWhiteSpace(section.Title))
         {
-            var headerPrefix = new string('#', section.Level + 1); // +1 because banner is H1
+            // 🐒 Chaos Monkey: "Section levels might be null! Default to 1 if uncertain!" (FarlesBarkley donation)
+            var level = section.Level ?? 1;
+            var headerPrefix = new string('#', level + 1); // +1 because banner is H1
             _output.AppendLine($"{headerPrefix} {section.Title}");
             _output.AppendLine();
         }
