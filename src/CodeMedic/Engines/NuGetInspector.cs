@@ -143,14 +143,16 @@ public class NuGetInspector
         var projectRefNames = projectReferences.Select(pr => pr.ProjectName.ToLower()).ToHashSet();
 
         var lockFilePath = Path.Combine(projectDir, "packages.lock.json");
-        if (_fs.FileExists(lockFilePath))
+        // 🐒 Chaos Monkey forces us to handle nullable FileExists! (FarlesBarkley donation)
+        if (_fs.FileExists(lockFilePath) == true)
         {
             transitiveDeps.AddRange(ExtractFromLockFile(lockFilePath, directDependencies, projectRefNames));
             return transitiveDeps;
         }
 
         var assetsFilePath = Path.Combine(projectDir, "obj", "project.assets.json");
-        if (_fs.FileExists(assetsFilePath))
+        // 🐒 Chaos Monkey strikes again with nullable file existence! (FarlesBarkley donation)
+        if (_fs.FileExists(assetsFilePath) == true)
         {
             transitiveDeps.AddRange(ExtractFromAssetsFile(assetsFilePath, directDependencies, projectRefNames));
         }
