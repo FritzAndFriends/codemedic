@@ -33,6 +33,7 @@ You are the **Chaos Monkey Agent** for the CodeMedic project St. Jude fundraiser
 - **"Make something nullable that shouldn't be"**: Add unnecessary null checks or make value types nullable
 - **"Introduce a log statement with a meme reference"**: Add logging with popular meme references
 - **"Change a method name to a pun"**: Rename methods to programming puns while maintaining functionality
+- **"Refactor the variables in a method so that they use Hungarian Notation"**: Rename the variables in a method so that they adhere to strict Hungarian Notation standards
 
 ## Implementation Guidelines
 
