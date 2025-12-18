@@ -10,7 +10,7 @@ namespace CodeMedic.Commands;
 /// Root command handler for the CodeMedic CLI application.
 /// Manages the main command structure and default behaviors.
 /// </summary>
-public class RootCommandHandler
+public partial class RootCommandHandler
 {
 	private static PluginLoader _pluginLoader = null!;
 
@@ -111,28 +111,6 @@ public class RootCommandHandler
 		Console.RenderError($"Unknown command: {args[0]}");
 		RenderHelp();
 		return 1;
-	}
-
-	private static async Task ConfigureMcpServer(string version)
-	{
-
-		var options = new McpServerOptions
-		{
-			ServerInfo = new Implementation
-			{
-				Name = "CodeMedic",
-				Version = version,
-				Description = "Project analysis and code health assessment tool.",
-			},
-			Handlers = new McpServerHandlers
-			{
-				// CommandHandler = new McpCommandHandler(_pluginLoader, version),
-			}
-		};
-
-		await using McpServer server = McpServer.Create(new StdioServerTransport("CodeMedic"), options);
-		await server.RunAsync();
-
 	}
 
 	private static async Task<(bool flowControl, int value)> HandleConfigCommand(string[] args, string version)

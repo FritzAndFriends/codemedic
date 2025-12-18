@@ -41,7 +41,7 @@ public class NuGetInspector
             var processInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"restore \"{_rootPath}\"",
+                Arguments = $"restore \"{_rootPath}\" --prerelease",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
