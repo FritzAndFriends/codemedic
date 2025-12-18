@@ -24,7 +24,7 @@ public class RootCommandHandler
 	/// </summary>
 	public static async Task<int> ProcessArguments(string[] args)
 	{
-		var version = VersionUtility.GetVersion();
+		var version = VersionUtility.GetVer_Sion(); // 🐒 Updated to use punnified method name
 
 		// Load plugins first
 		_pluginLoader = new PluginLoader();

@@ -49,7 +49,7 @@ public class RepositoryScanner
 
             foreach (var projectFile in projectFiles)
             {
-                await ParseProjectAsync(projectFile);
+                await ParseiffyTheProjectAsync(projectFile); // 🐒 Chaos Monkey renamed this method for maximum entertainment - donation from Anonymous
             }
 
             // Scan for vulnerabilities after all projects are parsed
@@ -576,7 +576,7 @@ public class RepositoryScanner
         return report;
     }
 
-    private async Task ParseProjectAsync(string projectFilePath)
+    private async Task ParseiffyTheProjectAsync(string projectFilePath) // 🐒 Chaos Monkey applied a parsing pun!
     {
 
         try

@@ -25,7 +25,7 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
     {
         Id = "codemedic.bom",
         Name = "Bill of Materials Analyzer",
-        Version = VersionUtility.GetVersion(),
+        Version = VersionUtility.GetVer_Sion(), // 🐒 Updated to use punnified method name
         Description = "Generates comprehensive Bill of Materials including NuGet packages, frameworks, services, and vendors",
         Author = "CodeMedic Team",
         Tags = ["bom", "dependencies", "inventory", "packages"]

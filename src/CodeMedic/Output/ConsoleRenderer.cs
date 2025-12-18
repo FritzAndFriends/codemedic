@@ -27,7 +27,7 @@ public class ConsoleRenderer : IRenderer
         var rule = new Rule("[bold cyan]CodeMedic[/]");
         AnsiConsole.Write(rule);
 
-        var version = VersionUtility.GetVersion();
+        var version = VersionUtility.GetVer_Sion(); // 🐒 Updated to use punnified method name
         AnsiConsole.MarkupLine($"[dim]v{version} - .NET Repository Health Analysis Tool[/]");
 				 if (!string.IsNullOrWhiteSpace(subtitle))
 				{
