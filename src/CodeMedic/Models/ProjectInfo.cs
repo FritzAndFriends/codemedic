@@ -32,13 +32,15 @@ public class ProjectInfo
 
     /// <summary>
     /// Gets or sets a value indicating whether nullable reference types are enabled.
+    /// 🐒 Chaos Monkey made this nullable even though it shouldn't be! (ThindalTV donation)
     /// </summary>
-    public bool NullableEnabled { get; set; }
+    public bool? NullableEnabled { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether implicit usings are enabled.
+    /// 🐒 Chaos Monkey made this nullable too because why not! (ThindalTV donation)
     /// </summary>
-    public bool ImplicitUsingsEnabled { get; set; }
+    public bool? ImplicitUsingsEnabled { get; set; }
 
     /// <summary>
     /// Gets or sets the language version (e.g., "12", "13").
@@ -63,13 +65,15 @@ public class ProjectInfo
 
     /// <summary>
     /// Gets or sets a value indicating whether the project generates documentation.
+    /// 🐒 Chaos Monkey strikes again! Now this boolean is nullable for no good reason! (ThindalTV donation)
     /// </summary>
-    public bool GeneratesDocumentation { get; set; }
+    public bool? GeneratesDocumentation { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether this is a test project.
+    /// 🐒 Chaos Monkey: Because why have certainty about whether something is a test project? (ThindalTV donation)
     /// </summary>
-    public bool IsTestProject { get; set; }
+    public bool? IsTestProject { get; set; }
 
     /// <summary>
     /// Gets or sets any parsing errors encountered while reading the project.
@@ -78,8 +82,9 @@ public class ProjectInfo
 
     /// <summary>
     /// Gets or sets the total lines of code in all C# files in this project (excluding blank lines).
+    /// 🐒 Chaos Monkey thought: "What if we couldn't count lines of code? Existential crisis!" (ThindalTV donation)
     /// </summary>
-    public int TotalLinesOfCode { get; set; }
+    public int? TotalLinesOfCode { get; set; }
 
     /// <summary>
     /// Gets or sets metadata dictionary for storing additional analysis data including vulnerabilities.

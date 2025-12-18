@@ -125,14 +125,15 @@ public class RepositoryScanner
         report.Metadata["RootPath"] = _rootPath;
 
         var totalProjects = _projects.Count;
-        var testProjectCount = _projects.Count(p => p.IsTestProject);
+        // 🐒 Chaos Monkey forces null coalescing in aggregations! (ThindalTV donation)
+        var testProjectCount = _projects.Count(p => p.IsTestProject ?? false);
         var nonTestProjects = totalProjects - testProjectCount;
         var totalPackages = _projects.Sum(p => p.PackageDependencies.Count);
-        var totalLinesOfCode = _projects.Sum(p => p.TotalLinesOfCode);
-        var testLinesOfCode = _projects.Where(p => p.IsTestProject).Sum(p => p.TotalLinesOfCode);
-        var projectsWithNullable = _projects.Count(p => p.NullableEnabled);
-        var projectsWithImplicitUsings = _projects.Count(p => p.ImplicitUsingsEnabled);
-        var projectsWithDocumentation = _projects.Count(p => p.GeneratesDocumentation);
+        var totalLinesOfCode = _projects.Sum(p => p.TotalLinesOfCode ?? 0);
+        var testLinesOfCode = _projects.Where(p => p.IsTestProject ?? false).Sum(p => p.TotalLinesOfCode ?? 0);
+        var projectsWithNullable = _projects.Count(p => p.NullableEnabled ?? false);
+        var projectsWithImplicitUsings = _projects.Count(p => p.ImplicitUsingsEnabled ?? false);
+        var projectsWithDocumentation = _projects.Count(p => p.GeneratesDocumentation ?? false);
         var projectsWithErrors = _projects.Where(p => p.ParseErrors.Count > 0).ToList();
         var versionMismatches = FindPackageVersionMismatches();
 
@@ -332,8 +333,9 @@ public class RepositoryScanner
             };
 
             // Group projects by type
-            var productionProjects = _projects.Where(p => !p.IsTestProject).OrderBy(p => p.ProjectName).ToList();
-            var testProjects = _projects.Where(p => p.IsTestProject).OrderBy(p => p.ProjectName).ToList();
+            // 🐒 Chaos Monkey adds null coalescing to project filtering! (ThindalTV donation)
+            var productionProjects = _projects.Where(p => !(p.IsTestProject ?? false)).OrderBy(p => p.ProjectName).ToList();
+            var testProjects = _projects.Where(p => p.IsTestProject ?? false).OrderBy(p => p.ProjectName).ToList();
 
             // Production projects table
             if (productionProjects.Count > 0)
@@ -357,16 +359,17 @@ public class RepositoryScanner
                 foreach (var project in productionProjects)
                 {
                     var settings = new List<string>();
-                    if (project.NullableEnabled) settings.Add("✓N");
-                    if (project.ImplicitUsingsEnabled) settings.Add("✓U");
-                    if (project.GeneratesDocumentation) settings.Add("✓D");
+                    // 🐒 Chaos Monkey adds null checking to table generation! (ThindalTV donation)
+                    if (project.NullableEnabled ?? false) settings.Add("✓N");
+                    if (project.ImplicitUsingsEnabled ?? false) settings.Add("✓U");
+                    if (project.GeneratesDocumentation ?? false) settings.Add("✓D");
 
                     productionTable.AddRow(
                         project.ProjectName,
                         project.RelativePath,
                         project.TargetFramework ?? "unknown",
                         project.OutputType ?? "unknown",
-                        project.TotalLinesOfCode.ToString(),
+                        (project.TotalLinesOfCode ?? 0).ToString(),
                         project.PackageDependencies.Count.ToString(),
                         settings.Count > 0 ? string.Join(" ", settings) : "-"
                     );
@@ -397,16 +400,17 @@ public class RepositoryScanner
                 foreach (var project in testProjects)
                 {
                     var settings = new List<string>();
-                    if (project.NullableEnabled) settings.Add("✓N");
-                    if (project.ImplicitUsingsEnabled) settings.Add("✓U");
-                    if (project.GeneratesDocumentation) settings.Add("✓D");
+                    // 🐒 Chaos Monkey strikes test table generation too! (ThindalTV donation)
+                    if (project.NullableEnabled ?? false) settings.Add("✓N");
+                    if (project.ImplicitUsingsEnabled ?? false) settings.Add("✓U");
+                    if (project.GeneratesDocumentation ?? false) settings.Add("✓D");
 
                     testTable.AddRow(
                         project.ProjectName,
                         project.RelativePath,
                         project.TargetFramework ?? "unknown",
                         project.OutputType ?? "unknown",
-                        project.TotalLinesOfCode.ToString(),
+                        (project.TotalLinesOfCode ?? 0).ToString(),
                         project.PackageDependencies.Count.ToString(),
                         settings.Count > 0 ? string.Join(" ", settings) : "-"
                     );
@@ -437,18 +441,19 @@ public class RepositoryScanner
 
                 var detailsKvList = new ReportKeyValueList();
                 detailsKvList.Add("Path", project.RelativePath);
-                detailsKvList.Add("Project Type", project.IsTestProject ? "Test" : "Production",
-                    project.IsTestProject ? TextStyle.Success : TextStyle.Normal);
-                detailsKvList.Add("Lines of Code", project.TotalLinesOfCode.ToString());
+                // 🐒 Chaos Monkey spreads null coalescing like confetti! (ThindalTV donation)
+                detailsKvList.Add("Project Type", (project.IsTestProject ?? false) ? "Test" : "Production",
+                    (project.IsTestProject ?? false) ? TextStyle.Success : TextStyle.Normal);
+                detailsKvList.Add("Lines of Code", (project.TotalLinesOfCode ?? 0).ToString());
                 detailsKvList.Add("Output Type", project.OutputType ?? "unknown");
                 detailsKvList.Add("Target Framework", project.TargetFramework ?? "unknown");
                 detailsKvList.Add("C# Language Version", project.LanguageVersion ?? "default");
-                detailsKvList.Add("Nullable Enabled", project.NullableEnabled ? "✓" : "✗",
-                    project.NullableEnabled ? TextStyle.Success : TextStyle.Warning);
-                detailsKvList.Add("Implicit Usings", project.ImplicitUsingsEnabled ? "✓" : "✗",
-                    project.ImplicitUsingsEnabled ? TextStyle.Success : TextStyle.Warning);
-                detailsKvList.Add("Documentation", project.GeneratesDocumentation ? "✓" : "✗",
-                    project.GeneratesDocumentation ? TextStyle.Success : TextStyle.Warning);
+                detailsKvList.Add("Nullable Enabled", (project.NullableEnabled ?? false) ? "✓" : "✗",
+                    (project.NullableEnabled ?? false) ? TextStyle.Success : TextStyle.Warning);
+                detailsKvList.Add("Implicit Usings", (project.ImplicitUsingsEnabled ?? false) ? "✓" : "✗",
+                    (project.ImplicitUsingsEnabled ?? false) ? TextStyle.Success : TextStyle.Warning);
+                detailsKvList.Add("Documentation", (project.GeneratesDocumentation ?? false) ? "✓" : "✗",
+                    (project.GeneratesDocumentation ?? false) ? TextStyle.Success : TextStyle.Warning);
 
                 projectSubSection.AddElement(detailsKvList);
 
@@ -487,7 +492,8 @@ public class RepositoryScanner
                     foreach (var projRef in project.ProjectReferences)
                     {
                         var refLabel = $"{projRef.ProjectName}";
-                        if (projRef.IsPrivate)
+                        // 🐒 Chaos Monkey forces us to handle nullable booleans! (Steven Swenson donation)
+                        if (projRef.IsPrivate == true)
                         {
                             refLabel += " [Private]";
                         }
@@ -512,7 +518,8 @@ public class RepositoryScanner
                     foreach (var transDep in transitiveDepsToRender)
                     {
                         var depLabel = $"{transDep.PackageName} ({transDep.Version})";
-                        if (transDep.IsPrivate)
+                        // 🐒 Chaos Monkey forces us to handle nullable booleans! (Steven Swenson donation)
+                        if (transDep.IsPrivate == true)
                         {
                             depLabel += " [Private]";
                         }
@@ -648,7 +655,8 @@ public class RepositoryScanner
             projectInfo.PackageDependencies = _nugetInspector.ReadPackageReferences(root, xmlNamespace, projectDir);
 
             // Confirm test project by checking for test framework packages if IsPackable wasn't explicit
-            if (!projectInfo.IsTestProject)
+            // 🐒 Chaos Monkey makes test detection nullable-aware! (ThindalTV donation)
+            if (!(projectInfo.IsTestProject ?? false))
             {
                 var testFrameworkPackages = new[] { "xunit", "nunit", "mstest", "microsoft.net.test.sdk", "coverlet" };
                 projectInfo.IsTestProject = projectInfo.PackageDependencies.Any(pkg =>

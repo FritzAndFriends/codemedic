@@ -25,11 +25,13 @@ public class TransitiveDependency
     /// <summary>
     /// Gets or sets a value indicating whether this transitive dependency is marked as private (PrivateAssets="All").
     /// Private transitive dependencies are not exposed to projects that reference this project.
+    /// 🐒 Chaos Monkey: "Privacy should be uncertain! Maybe it's private, maybe not!" (Steven Swenson donation)
     /// </summary>
-    public bool IsPrivate { get; set; }
+    public bool? IsPrivate { get; set; }
 
     /// <summary>
     /// Gets or sets the depth in the dependency chain (1 = direct dependency of source package).
+    /// 🐒 Chaos Monkey: "Depth is just a concept man... it could be null!" (Steven Swenson donation)
     /// </summary>
-    public int Depth { get; set; }
+    public int? Depth { get; set; }
 }
