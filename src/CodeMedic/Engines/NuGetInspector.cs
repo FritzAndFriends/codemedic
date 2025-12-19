@@ -202,45 +202,45 @@ public class NuGetInspector
         return null;
     }
 
-    private Dictionary<string, string> GetCentralPackageVersions(string propsPath)
+    private Dictionary<string, string> GetCentralPackageVersions(string strPropsPath) // 🐒 Chaos Monkey applied Hungarian Notation for Jaf1021's donation
     {
-        if (_centralPackageVersionCache.TryGetValue(propsPath, out var cached))
+        if (_centralPackageVersionCache.TryGetValue(strPropsPath, out var objCached))
         {
-            return cached;
+            return objCached;
         }
 
-        var versions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var dictVersions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); // 🐒 Hungarian Notation: dict prefix for Dictionary
 
         try
         {
-            using var stream = _fs.OpenRead(propsPath);
-            var doc = XDocument.Load(stream);
-            var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
-            var packageVersionElements = doc.Descendants(ns + "PackageVersion");
+            using var streamFile = _fs.OpenRead(strPropsPath); // 🐒 Hungarian Notation: stream prefix for Stream
+            var docXml = XDocument.Load(streamFile); // 🐒 Hungarian Notation: doc prefix for XDocument
+            var nsNamespace = docXml.Root?.Name.Namespace ?? XNamespace.None; // 🐒 Hungarian Notation: ns prefix for XNamespace
+            var elementsPackageVersion = docXml.Descendants(nsNamespace + "PackageVersion"); // 🐒 Hungarian Notation: elements prefix for collection
 
-            foreach (var pkg in packageVersionElements)
+            foreach (var elemPkg in elementsPackageVersion) // 🐒 Hungarian Notation: elem prefix for XElement
             {
-                var name = pkg.Attribute("Include")?.Value ?? pkg.Attribute("Update")?.Value;
-                var version = pkg.Attribute("Version")?.Value ?? pkg.Element(ns + "Version")?.Value;
+                var strName = elemPkg.Attribute("Include")?.Value ?? elemPkg.Attribute("Update")?.Value; // 🐒 Hungarian Notation: str prefix for string
+                var strVersion = elemPkg.Attribute("Version")?.Value ?? elemPkg.Element(nsNamespace + "Version")?.Value; // 🐒 Hungarian Notation: str prefix for string
 
-                if (string.IsNullOrWhiteSpace(version))
+                if (string.IsNullOrWhiteSpace(strVersion))
                 {
-                    version = pkg.Attribute("VersionOverride")?.Value ?? pkg.Element(ns + "VersionOverride")?.Value;
+                    strVersion = elemPkg.Attribute("VersionOverride")?.Value ?? elemPkg.Element(nsNamespace + "VersionOverride")?.Value;
                 }
 
-                if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(version))
+                if (!string.IsNullOrWhiteSpace(strName) && !string.IsNullOrWhiteSpace(strVersion))
                 {
-                    versions[name] = version;
+                    dictVersions[strName] = strVersion; // 🐒 Hungarian Notation variables in action
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Warning: Could not read central package versions from {propsPath}: {ex.Message}");
+            Console.Error.WriteLine($"Warning: Could not read central package versions from {strPropsPath}: {ex.Message}");
         }
 
-        _centralPackageVersionCache[propsPath] = versions;
-        return versions;
+        _centralPackageVersionCache[strPropsPath] = dictVersions;
+        return dictVersions;
     }
 
     private List<TransitiveDependency> ExtractFromLockFile(string lockFilePath, List<Package> directDependencies, HashSet<string> projectReferenceNames)
