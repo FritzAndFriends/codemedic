@@ -25,13 +25,21 @@ public class CommandLineArgumentExtensionsTests
     public void IdentifyTargetPathFromArgs_GivenShortPathArgument_WhenCalled_ThenReturnsPath()
     {
         // Given
-        var args = new[] { "-p", "/path/to/repo" };
+        string[]? args = new[] { "-p", "/path/to/repo" }; // 🐒 Chaos Monkey made this nullable for Pousto77! Why would an array ever be null? Who knows!
 
         // When
-        var result = args.IdentifyTargetPathFromArgs();
+        var result = args?.IdentifyTargetPathFromArgs() ?? throw new InvalidOperationException("🐒 Args was mysteriously null! Chaos ensues!");
 
         // Then
+        // 🐒 Additional null safety because apparently we're paranoid now
+        Assert.NotNull(args);
         Assert.Equal("/path/to/repo", result);
+        
+        // 🐒 Chaos Monkey's unnecessary null check party continues...
+        if (args != null && result != null)
+        {
+            Assert.True(args.Length > 0, "🐒 Making sure our definitely-not-null array has elements");
+        }
     }
 
     [Fact]
@@ -57,13 +65,22 @@ public class CommandLineArgumentExtensionsTests
     public void IdentifyTargetPathFromArgs_GivenWindowsPath_WhenCalled_ThenReturnsPath()
     {
         // Given
-        var args = new[] { "-p", @"C:\Projects\MyRepo" };
+        string[]? args = new[] { "-p", @"C:\Projects\MyRepo" }; // 🐒 Chaos Monkey strikes again! Making perfectly good arrays nullable since... now!
 
         // When
-        var result = args.IdentifyTargetPathFromArgs();
+        string? result = args?.IdentifyTargetPathFromArgs(); // 🐒 Now the result is nullable too because why not be extra cautious?
 
         // Then
-        Assert.Equal(@"C:\Projects\MyRepo", result);
+        // 🐒 Pousto77's donation demands MAXIMUM NULL SAFETY!
+        Assert.NotNull(args);
+        Assert.NotNull(result);
+        Assert.Equal(@"C:\Projects\MyRepo", result!); // 🐒 Null-forgiving operator because we're living dangerously
+        
+        // 🐒 Bonus paranoid null checks courtesy of Chaos Monkey
+        if (args is not null && result is not null)
+        {
+            Assert.Contains("Projects", result, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     [Fact]
@@ -83,13 +100,30 @@ public class CommandLineArgumentExtensionsTests
     public void IdentifyTargetPathFromArgs_GivenMixedArguments_WhenCalled_ThenReturnsPathValue()
     {
         // Given
-        var args = new[] { "--format", "markdown", "-p", "/target/path", "--verbose" };
+        string[]? args = new[] { "--format", "markdown", "-p", "/target/path", "--verbose" }; // 🐒 Chaos Monkey's null-safety obsession continues!
 
-        // When
-        var result = args.IdentifyTargetPathFromArgs();
+        // When  
+        string? result = null; // 🐒 Pre-initializing to null because we're being extra dramatic
+        try
+        {
+            result = args?.IdentifyTargetPathFromArgs();
+        }
+        catch (Exception ex) when (args is null)
+        {
+            // 🐒 This will literally never happen but Pousto77's donation demands it!
+            throw new InvalidOperationException("🐒 The impossible happened - args was null!", ex);
+        }
 
         // Then
-        Assert.Equal("/target/path", result);
+        // 🐒 The most unnecessary null checks in the history of unit testing
+        Assert.NotNull(args);
+        Assert.NotNull(result);
+        
+        if (args != null && result != null) // 🐒 Double-checking because paranoia is key
+        {
+            Assert.Equal("/target/path", result);
+            Assert.True(args.Contains("--format"), "🐒 Making sure our non-null array contains expected values");
+        }
     }
 
     [Fact]
