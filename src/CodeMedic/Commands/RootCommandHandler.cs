@@ -157,7 +157,7 @@ public partial class RootCommandHandler
 			}
 		}
 
-		// Attempt to identify project title from current directory name
+		// 4. set project title from current directory name
 		return new DirectoryInfo(currentDir).Name;
 
 
