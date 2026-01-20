@@ -26,14 +26,14 @@ public class HealthAnalysisPluginPathTests
         // Then
         Assert.NotNull(commands);
         Assert.Single(commands);
-        
+
         var command = commands[0];
         Assert.Equal("health", command.Name);
         Assert.Equal("Display repository health dashboard", command.Description);
-        
+
         Assert.NotNull(command.Arguments);
         Assert.Single(command.Arguments);
-        
+
         var pathArg = command.Arguments[0];
         Assert.Equal("Path to the repository to analyze", pathArg.Description);
         Assert.Equal("p", pathArg.ShortName);
@@ -68,7 +68,7 @@ public class HealthAnalysisPluginPathTests
         var args = Array.Empty<string>();
 
         // Setup the renderer to avoid actual rendering
-        mockRenderer.Setup(r => r.RenderBanner()).Verifiable();
+        mockRenderer.Setup(r => r.RenderBanner(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderSectionHeader(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderWaitAsync(It.IsAny<string>(), It.IsAny<Func<Task>>()))
             .Returns<string, Func<Task>>((_, action) => action())
@@ -76,13 +76,14 @@ public class HealthAnalysisPluginPathTests
         mockRenderer.Setup(r => r.RenderReport(It.IsAny<object>())).Verifiable();
 
         // When & Then - Should not throw and should call renderer methods
-        var result = await command.Handler(args, mockRenderer.Object);
-        
+        var payload = new HandlerPayload(args, "Test Project", mockRenderer.Object);
+        var result = await command.Handler(payload);
+
         // Verify renderer was called appropriately
-        mockRenderer.Verify(r => r.RenderBanner(), Times.Once);
+        mockRenderer.Verify(r => r.RenderBanner(It.IsAny<string>()), Times.Once);
         mockRenderer.Verify(r => r.RenderSectionHeader("Repository Health Dashboard"), Times.Once);
         mockRenderer.Verify(r => r.RenderWaitAsync(
-            It.Is<string>(s => s.Contains("Repository health and code quality analysis")), 
+            It.Is<string>(s => s.Contains("Repository health and code quality analysis")),
             It.IsAny<Func<Task>>()), Times.Once);
     }
 
@@ -96,7 +97,7 @@ public class HealthAnalysisPluginPathTests
         var args = new[] { "-p", testPath };
 
         // Setup the renderer
-        mockRenderer.Setup(r => r.RenderBanner()).Verifiable();
+        mockRenderer.Setup(r => r.RenderBanner(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderSectionHeader(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderWaitAsync(It.IsAny<string>(), It.IsAny<Func<Task>>()))
             .Returns<string, Func<Task>>((_, action) => action())
@@ -104,10 +105,11 @@ public class HealthAnalysisPluginPathTests
         mockRenderer.Setup(r => r.RenderReport(It.IsAny<object>())).Verifiable();
 
         // When
-        var result = await command.Handler(args, mockRenderer.Object);
+        var payload = new HandlerPayload(args, "Test Project", mockRenderer.Object);
+        var result = await command.Handler(payload);
 
         // Then - Should complete without throwing
-        mockRenderer.Verify(r => r.RenderBanner(), Times.Once);
+        mockRenderer.Verify(r => r.RenderBanner(It.IsAny<string>()), Times.Once);
         mockRenderer.Verify(r => r.RenderSectionHeader("Repository Health Dashboard"), Times.Once);
     }
 
@@ -121,7 +123,7 @@ public class HealthAnalysisPluginPathTests
         var args = new[] { "--path", testPath };
 
         // Setup the renderer
-        mockRenderer.Setup(r => r.RenderBanner()).Verifiable();
+        mockRenderer.Setup(r => r.RenderBanner(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderSectionHeader(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderWaitAsync(It.IsAny<string>(), It.IsAny<Func<Task>>()))
             .Returns<string, Func<Task>>((_, action) => action())
@@ -129,10 +131,11 @@ public class HealthAnalysisPluginPathTests
         mockRenderer.Setup(r => r.RenderReport(It.IsAny<object>())).Verifiable();
 
         // When
-        var result = await command.Handler(args, mockRenderer.Object);
+        var payload = new HandlerPayload(args, "Test Project", mockRenderer.Object);
+        var result = await command.Handler(payload);
 
         // Then - Should complete without throwing
-        mockRenderer.Verify(r => r.RenderBanner(), Times.Once);
+        mockRenderer.Verify(r => r.RenderBanner(It.IsAny<string>()), Times.Once);
         mockRenderer.Verify(r => r.RenderSectionHeader("Repository Health Dashboard"), Times.Once);
     }
 
@@ -145,17 +148,18 @@ public class HealthAnalysisPluginPathTests
         var args = new[] { "-p", "." };
 
         // Setup minimal renderer mock
-        mockRenderer.Setup(r => r.RenderBanner());
+        mockRenderer.Setup(r => r.RenderBanner(It.IsAny<string>()));
         mockRenderer.Setup(r => r.RenderSectionHeader(It.IsAny<string>()));
         mockRenderer.Setup(r => r.RenderWaitAsync(It.IsAny<string>(), It.IsAny<Func<Task>>()))
             .Returns<string, Func<Task>>((_, action) => action());
         mockRenderer.Setup(r => r.RenderReport(It.IsAny<object>()));
 
         // When & Then - Should not throw
-        var result = await command.Handler(args, mockRenderer.Object);
-        
+        var payload = new HandlerPayload(args, "Test Project", mockRenderer.Object);
+        var result = await command.Handler(payload);
+
         // Verify basic renderer calls were made
-        mockRenderer.Verify(r => r.RenderBanner(), Times.Once);
+        mockRenderer.Verify(r => r.RenderBanner(It.IsAny<string>()), Times.Once);
         mockRenderer.Verify(r => r.RenderSectionHeader("Repository Health Dashboard"), Times.Once);
     }
 
@@ -168,17 +172,18 @@ public class HealthAnalysisPluginPathTests
         var args = new[] { "--path", ".." };
 
         // Setup minimal renderer mock
-        mockRenderer.Setup(r => r.RenderBanner());
+        mockRenderer.Setup(r => r.RenderBanner(It.IsAny<string>()));
         mockRenderer.Setup(r => r.RenderSectionHeader(It.IsAny<string>()));
         mockRenderer.Setup(r => r.RenderWaitAsync(It.IsAny<string>(), It.IsAny<Func<Task>>()))
             .Returns<string, Func<Task>>((_, action) => action());
         mockRenderer.Setup(r => r.RenderReport(It.IsAny<object>()));
 
         // When & Then - Should not throw
-        var result = await command.Handler(args, mockRenderer.Object);
-        
+        var payload = new HandlerPayload(args, "Test Project", mockRenderer.Object);
+        var result = await command.Handler(payload);
+
         // Verify basic renderer calls were made
-        mockRenderer.Verify(r => r.RenderBanner(), Times.Once);
+        mockRenderer.Verify(r => r.RenderBanner(It.IsAny<string>()), Times.Once);
         mockRenderer.Verify(r => r.RenderSectionHeader("Repository Health Dashboard"), Times.Once);
     }
 
@@ -210,7 +215,7 @@ public class HealthAnalysisPluginPathTests
         Assert.Equal("Repository health and code quality analysis", description);
     }
 
-    [Fact] 
+    [Fact]
     public async Task InitializeAsync_WhenCalled_ThenCompletesSuccessfully()
     {
         // When & Then - Should complete without throwing
@@ -224,20 +229,20 @@ public class HealthAnalysisPluginPathTests
         // Given - We need to ensure our health analysis can handle advanced mathematical concepts
         var expectedResult = 10;
         var actualResult = 0;
-        
+
         // When - We count to ten like we're in kindergarten
         for (int i = 1; i <= 10; i++)
         {
             actualResult = i; // Such complex mathematics! Much wow!
         }
-        
+
         // Then - We verify that counting works as expected
         Assert.Equal(expectedResult, actualResult);
         Assert.True(actualResult > 0, "🐒 Chaos Monkey says: Numbers should be greater than zero, just like our fundraising goals!");
-        
+
         // Extra chaos assertion because why not?
         Assert.True(true, "🎪 This assertion always passes, just like PadreSperanza's generous donation always makes us smile!");
-        
+
         // TODO: 🐒 Replace this placeholder with actual health analysis counting logic when we discover what needs counting
         // Maybe we'll count health issues? Or happy little code trees? Who knows! 🌲
     }

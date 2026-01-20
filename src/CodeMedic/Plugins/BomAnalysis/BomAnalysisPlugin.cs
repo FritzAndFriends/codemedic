@@ -88,8 +88,12 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         ];
     }
 
-    private async Task<int> ExecuteBomCommandAsync(string[] args, IRenderer renderer)
+    private async Task<int> ExecuteBomCommandAsync(HandlerPayload payload)
     {
+
+		var args = payload.Args;
+		var renderer = payload.Renderer;
+
         try
         {
             // Parse arguments (target path only)
@@ -103,7 +107,7 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
             }
 
             // Render banner and header
-            renderer.RenderBanner();
+            renderer.RenderBanner($"Report for project {payload.ProjectTitle}");
             renderer.RenderSectionHeader("Bill of Materials (BOM)");
 
             // Run analysis
@@ -116,6 +120,11 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
             });
 
             reportDocument = await AnalyzeAsync(repositoryPath);
+
+			if (reportDocument is ReportDocument rd)
+			{
+				rd.ProjectName = payload.ProjectTitle;
+			}
 
             // Render report
             renderer.RenderReport(reportDocument);

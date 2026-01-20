@@ -1,3 +1,4 @@
+using CodeMedic.Abstractions.Plugins;
 using CodeMedic.Output;
 using CodeMedic.Utilities;
 using ModelContextProtocol.Protocol;
@@ -44,19 +45,19 @@ public partial class RootCommandHandler
 			return 0;
 		}
 
-
-		var (flowControl, value) = await HandleConfigCommand(args, version);
-		if (!flowControl)
-		{
-			return value;
-		}
-
 		// Version requested
 		if (args.Contains("--version") || args.Contains("-v") || args.Contains("version"))
 		{
 			ConsoleRenderer.RenderVersion(version);
 			RenderPluginInfo();
 			return 0;
+		}
+
+		// Handle configuration file command
+		var (flowControl, value) = await HandleConfigCommand(args, version);
+		if (!flowControl)
+		{
+			return value;
 		}
 
 		// Check if a plugin registered this command
@@ -104,13 +105,62 @@ public partial class RootCommandHandler
 				"markdown" or "md" => new MarkdownRenderer(),
 				_ => new ConsoleRenderer()
 			};
-			return await commandRegistration.Handler(commandArgsList.ToArray(), renderer);
+			var handlerPayload = new HandlerPayload(
+				Args: commandArgsList.ToArray(),
+				ProjectTitle: IdentifyProjectTitle(),
+				Renderer: renderer
+			);
+			return await commandRegistration.Handler(handlerPayload);
 		}
 
 		// Unknown command
 		Console.RenderError($"Unknown command: {args[0]}");
 		RenderHelp();
 		return 1;
+	}
+
+	private static string IdentifyProjectTitle()
+	{
+
+		// work through the priorities for identifying project title
+
+		// 1. Solution file in current directory or child directories, if and only if there is exactly one solution file
+		var currentDir = Directory.GetCurrentDirectory();
+		var solutionFiles = Directory.GetFiles(currentDir, "*.sln", SearchOption.AllDirectories);
+		if (solutionFiles.Length == 1)
+		{
+			return Path.GetFileNameWithoutExtension(solutionFiles[0]);
+		}
+
+
+		// 2. Project name from csproj / vbproj / fsproj file in current directory or child directories, if and only if there is exactly one project file
+		var projectFiles = Directory.GetFiles(currentDir, "*.*proj", SearchOption.AllDirectories)
+			.Where(f => f.EndsWith(".csproj") || f.EndsWith(".vbproj") || f.EndsWith(".fsproj"))
+			.ToArray();
+		if (projectFiles.Length == 1)
+		{
+			return Path.GetFileNameWithoutExtension(projectFiles[0]);
+		}
+
+		// 3. Git origin remote repository name, if available
+		var gitDir = GitUtility.FindGitRepositoryRoot(currentDir);
+		if (gitDir != null)
+		{
+			var originUrl = GitUtility.GetGitRemoteOriginUrl(gitDir);
+			if (!string.IsNullOrEmpty(originUrl))
+			{
+				var repoName = GitUtility.ExtractRepositoryNameFromGitUrl(originUrl);
+				if (!string.IsNullOrEmpty(repoName))
+				{
+					return repoName;
+				}
+			}
+		}
+
+		// 4. set project title from current directory name
+		return new DirectoryInfo(currentDir).Name;
+
+
 	}
 
 	private static async Task<(bool flowControl, int value)> HandleConfigCommand(string[] args, string version)

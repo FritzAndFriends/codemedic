@@ -20,7 +20,7 @@ public class CommandRegistration
     /// <summary>
     /// Gets or sets the command handler that will be executed.
     /// </summary>
-    public required Func<string[], IRenderer, Task<int>> Handler { get; init; }
+    public required Func<HandlerPayload, Task<int>> Handler { get; init; }
 
     /// <summary>
     /// Gets or sets example usage strings for help text.
