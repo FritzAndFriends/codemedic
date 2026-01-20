@@ -26,14 +26,14 @@ public class BomAnalysisPluginPathTests
         // Then
         Assert.NotNull(commands);
         Assert.Single(commands);
-        
+
         var command = commands[0];
         Assert.Equal("bom", command.Name);
         Assert.Equal("Generate bill of materials report", command.Description);
-        
+
         Assert.NotNull(command.Arguments);
         Assert.Single(command.Arguments);
-        
+
         var pathArg = command.Arguments[0];
         Assert.Equal("Path to the repository to analyze", pathArg.Description);
         Assert.Equal("p", pathArg.ShortName);
@@ -68,7 +68,7 @@ public class BomAnalysisPluginPathTests
         var args = Array.Empty<string>();
 
         // Setup the renderer to avoid actual rendering
-        mockRenderer.Setup(r => r.RenderBanner()).Verifiable();
+        mockRenderer.Setup(r => r.RenderBanner(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderSectionHeader(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderWaitAsync(It.IsAny<string>(), It.IsAny<Func<Task>>()))
             .Returns<string, Func<Task>>((_, action) => action())
@@ -76,13 +76,14 @@ public class BomAnalysisPluginPathTests
         mockRenderer.Setup(r => r.RenderReport(It.IsAny<object>())).Verifiable();
 
         // When & Then - Should not throw and should call renderer methods
-        var result = await command.Handler(args, mockRenderer.Object);
-        
+        var payload = new HandlerPayload(args, "Test Project", mockRenderer.Object);
+        var result = await command.Handler(payload);
+
         // Verify renderer was called appropriately
-        mockRenderer.Verify(r => r.RenderBanner(), Times.Once);
+        mockRenderer.Verify(r => r.RenderBanner(It.IsAny<string>()), Times.Once);
         mockRenderer.Verify(r => r.RenderSectionHeader("Bill of Materials (BOM)"), Times.Once);
         mockRenderer.Verify(r => r.RenderWaitAsync(
-            It.Is<string>(s => s.Contains("Comprehensive dependency and service inventory (BOM)")), 
+            It.Is<string>(s => s.Contains("Comprehensive dependency and service inventory (BOM)")),
             It.IsAny<Func<Task>>()), Times.Once);
     }
 
@@ -96,7 +97,7 @@ public class BomAnalysisPluginPathTests
         var args = new[] { "-p", testPath };
 
         // Setup the renderer
-        mockRenderer.Setup(r => r.RenderBanner()).Verifiable();
+        mockRenderer.Setup(r => r.RenderBanner(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderSectionHeader(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderWaitAsync(It.IsAny<string>(), It.IsAny<Func<Task>>()))
             .Returns<string, Func<Task>>((_, action) => action())
@@ -104,10 +105,11 @@ public class BomAnalysisPluginPathTests
         mockRenderer.Setup(r => r.RenderReport(It.IsAny<object>())).Verifiable();
 
         // When
-        var result = await command.Handler(args, mockRenderer.Object);
+        var payload = new HandlerPayload(args, "Test Project", mockRenderer.Object);
+        var result = await command.Handler(payload);
 
         // Then - Should complete without throwing
-        mockRenderer.Verify(r => r.RenderBanner(), Times.Once);
+        mockRenderer.Verify(r => r.RenderBanner(It.IsAny<string>()), Times.Once);
         mockRenderer.Verify(r => r.RenderSectionHeader("Bill of Materials (BOM)"), Times.Once);
     }
 
@@ -121,7 +123,7 @@ public class BomAnalysisPluginPathTests
         var args = new[] { "--path", testPath };
 
         // Setup the renderer
-        mockRenderer.Setup(r => r.RenderBanner()).Verifiable();
+        mockRenderer.Setup(r => r.RenderBanner(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderSectionHeader(It.IsAny<string>())).Verifiable();
         mockRenderer.Setup(r => r.RenderWaitAsync(It.IsAny<string>(), It.IsAny<Func<Task>>()))
             .Returns<string, Func<Task>>((_, action) => action())
@@ -129,10 +131,11 @@ public class BomAnalysisPluginPathTests
         mockRenderer.Setup(r => r.RenderReport(It.IsAny<object>())).Verifiable();
 
         // When
-        var result = await command.Handler(args, mockRenderer.Object);
+        var payload = new HandlerPayload(args, "Test Project", mockRenderer.Object);
+        var result = await command.Handler(payload);
 
         // Then - Should complete without throwing
-        mockRenderer.Verify(r => r.RenderBanner(), Times.Once);
+        mockRenderer.Verify(r => r.RenderBanner(It.IsAny<string>()), Times.Once);
         mockRenderer.Verify(r => r.RenderSectionHeader("Bill of Materials (BOM)"), Times.Once);
     }
 
@@ -164,7 +167,7 @@ public class BomAnalysisPluginPathTests
         Assert.Equal("Comprehensive dependency and service inventory (BOM)", description);
     }
 
-    [Fact] 
+    [Fact]
     public async Task InitializeAsync_WhenCalled_ThenCompletesSuccessfully()
     {
         // When & Then - Should complete without throwing
@@ -180,17 +183,18 @@ public class BomAnalysisPluginPathTests
         var args = new[] { "-p", "." };
 
         // Setup minimal renderer mock
-        mockRenderer.Setup(r => r.RenderBanner());
+        mockRenderer.Setup(r => r.RenderBanner(It.IsAny<string>()));
         mockRenderer.Setup(r => r.RenderSectionHeader(It.IsAny<string>()));
         mockRenderer.Setup(r => r.RenderWaitAsync(It.IsAny<string>(), It.IsAny<Func<Task>>()))
             .Returns<string, Func<Task>>((_, action) => action());
         mockRenderer.Setup(r => r.RenderReport(It.IsAny<object>()));
 
         // When & Then - Should not throw
-        var result = await command.Handler(args, mockRenderer.Object);
-        
+        var payload = new HandlerPayload(args, "Test Project", mockRenderer.Object);
+        var result = await command.Handler(payload);
+
         // Verify basic renderer calls were made
-        mockRenderer.Verify(r => r.RenderBanner(), Times.Once);
+        mockRenderer.Verify(r => r.RenderBanner(It.IsAny<string>()), Times.Once);
         mockRenderer.Verify(r => r.RenderSectionHeader("Bill of Materials (BOM)"), Times.Once);
     }
 }
