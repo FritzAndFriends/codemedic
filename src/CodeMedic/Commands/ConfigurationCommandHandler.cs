@@ -1,6 +1,7 @@
 using CodeMedic.Utilities;
 using CodeMedic.Commands;
 using CodeMedic.Output;
+using CodeMedic.Abstractions.Plugins;
 
 namespace CodeMedic.Commands;
 
@@ -98,7 +99,15 @@ public class ConfigurationCommandHandler
 					// Build arguments array to pass the repository path to the command
 					var commandArgs = new[] { "--path", repoConfig.Path };
 
-					await commandPlugin.Handler(commandArgs, formatter);
+					// setup the handler payload and execute
+					var payload = new HandlerPayload
+					{
+						Args = commandArgs,
+						Renderer = formatter,
+						ProjectTitle = $"CodeMedic Report for {repoConfig.Name} - Command: {commandName}"
+					};
+
+					await commandPlugin.Handler(payload);
 				}
 
 			}

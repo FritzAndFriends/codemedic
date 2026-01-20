@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using CodeMedic.Abstractions.Plugins;
 using CodeMedic.Output;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -99,7 +100,14 @@ public partial class RootCommandHandler
 		var exitCode = 0;
 
 		try {
-			exitCode = await command.Handler(args, renderer);
+			// create the handler payload
+			var payload = new HandlerPayload
+			{
+				Args = args,
+				Renderer = renderer,
+				ProjectTitle = $"CodeMedic Tool Execution - {command.Name}"
+			};
+			exitCode = await command.Handler(payload);
 		}
 		catch (Exception ex)
 		{

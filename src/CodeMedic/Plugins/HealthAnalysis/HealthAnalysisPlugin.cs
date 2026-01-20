@@ -91,7 +91,7 @@ public class HealthAnalysisPlugin : IAnalysisEnginePlugin
             _limitPackageLists = renderer is ConsoleRenderer;
 
             // Render banner and header
-            renderer.RenderBanner();
+            renderer.RenderBanner($"Report for project {payload.ProjectTitle}");
             renderer.RenderSectionHeader("Repository Health Dashboard");
 
             // Run analysis
@@ -102,6 +102,11 @@ public class HealthAnalysisPlugin : IAnalysisEnginePlugin
             {
                 reportDocument = await AnalyzeAsync(repositoryPath);
             });
+
+			if (reportDocument is ReportDocument rd)
+			{
+				rd.ProjectName = payload.ProjectTitle;
+			}
 
             // Render report
             if (reportDocument != null)
