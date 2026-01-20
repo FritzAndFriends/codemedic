@@ -130,7 +130,6 @@ public class RepositoryScanner
         var nonTestProjects = totalProjects - testProjectCount;
         var totalPackages = _projects.Sum(p => p.PackageDependencies.Count);
         var totalLinesOfCode = _projects.Sum(p => p.TotalLinesOfCode ?? 0);
-        var testLinesOfCode = _projects.Where(p => p.IsTestProject ?? false).Sum(p => p.TotalLinesOfCode ?? 0);
         var projectsWithNullable = _projects.Count(p => p.NullableEnabled ?? false);
         var projectsWithImplicitUsings = _projects.Count(p => p.ImplicitUsingsEnabled ?? false);
         var projectsWithDocumentation = _projects.Count(p => p.GeneratesDocumentation ?? false);
@@ -165,13 +164,6 @@ public class RepositoryScanner
             summaryKvList.Add("Test Projects", testProjectCount.ToString(),
                 testProjectCount > 0 ? TextStyle.Success : TextStyle.Warning);
             summaryKvList.Add("Total Lines of Code", totalLinesOfCode.ToString());
-            if (testProjectCount > 0)
-            {
-                summaryKvList.Add("Test Lines of Code", testLinesOfCode.ToString());
-                var testCoverageRatio = totalLinesOfCode > 0 ? (double)testLinesOfCode / totalLinesOfCode : 0;
-                summaryKvList.Add("Test/Code Ratio", $"{testCoverageRatio:P1}",
-                    testCoverageRatio >= 0.3 ? TextStyle.Success : TextStyle.Warning);
-            }
             summaryKvList.Add("Total NuGet Packages", totalPackages.ToString());
             summaryKvList.Add("Known Vulnerabilities", allVulnerabilities.Count.ToString(),
                 allVulnerabilities.Count == 0 ? TextStyle.Success : TextStyle.Warning);
