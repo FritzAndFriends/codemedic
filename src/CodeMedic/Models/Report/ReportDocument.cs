@@ -10,6 +10,11 @@ public class ReportDocument
     /// </summary>
     public string Title { get; set; } = string.Empty;
 
+	/// <summary>
+	/// Gets or sets the project name associated with the report.
+	/// </summary>
+	public string ProjectName { get; set; } = string.Empty;
+
     /// <summary>
     /// Gets or sets the report metadata.
     /// </summary>

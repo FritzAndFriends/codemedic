@@ -88,8 +88,12 @@ public class BomAnalysisPlugin : IAnalysisEnginePlugin
         ];
     }
 
-    private async Task<int> ExecuteBomCommandAsync(string[] args, IRenderer renderer)
+    private async Task<int> ExecuteBomCommandAsync(HandlerPayload payload)
     {
+
+		var args = payload.Args;
+		var renderer = payload.Renderer;
+
         try
         {
             // Parse arguments (target path only)

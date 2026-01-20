@@ -78,8 +78,11 @@ public class HealthAnalysisPlugin : IAnalysisEnginePlugin
         ];
     }
 
-    private async Task<int> ExecuteHealthCommandAsync(string[] args, IRenderer renderer)
-    {
+    private async Task<int> ExecuteHealthCommandAsync(HandlerPayload payload)
+	{
+		var args = payload.Args;
+		var renderer = payload.Renderer;
+
         try
         {
             // Parse arguments (target path only)
